@@ -21,7 +21,7 @@ and unrelated devices. The repo is public.
 
 ## Consequences
 
-- Readable diffs, no parser dependency, real timing and real packet splits.
-  − Contributors need Wireshark/tshark to import a capture.
+- **Pro:** Readable diffs, no parser dependency, real timing and real packet splits.
+- **Con:** Contributors need Wireshark/tshark to import a capture.
 
 Rejected: committing raw captures; hand-written hex without timing.

@@ -1,8 +1,17 @@
 {
   "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
-  "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
-  "files": { "includes": ["**", "!**/.tsbuild", "!**/fixtures/**/*.jsonl"] },
-  "formatter": { "indentStyle": "space", "lineWidth": 100 },
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true
+  },
+  "files": {
+    "includes": ["**", "!**/fixtures/**/*.jsonl"]
+  },
+  "formatter": {
+    "indentStyle": "space",
+    "lineWidth": 100
+  },
   "linter": {
     "rules": {
       "preset": "recommended",
@@ -16,24 +25,27 @@
   "overrides": [
     {
       "includes": ["*.config.ts", "*.config.js"],
-      "linter": { "rules": { "style": { "noDefaultExport": "off" } } }
+      "linter": {
+        "rules": {
+          "style": {
+            "noDefaultExport": "off"
+          }
+        }
+      }
     },
     {
-      "includes": ["src/core/**", "src/drivers/**", "src/transports/replay/**", "src/index.ts"],
+      "includes": ["src/**"],
       "linter": {
         "rules": {
           "style": {
             "noRestrictedImports": {
               "level": "error",
               "options": {
-                "paths": {
-                  "react-native": "Core and drivers must stay platform-free. Platform code goes in src/transports.",
-                  "react-native-ble-plx": "Core and drivers must stay platform-free. Platform code goes in src/transports."
-                },
+                "paths": {},
                 "patterns": [
                   {
-                    "group": ["node:*"],
-                    "message": "Core and drivers must stay platform-free. Platform code goes in src/transports."
+                    "group": ["react-native", "react-native-*", "node:*"],
+                    "message": "OpenPour never performs I/O or uses platform APIs (ADR 0017). Bluetooth belongs to the consuming app."
                   }
                 ]
               }

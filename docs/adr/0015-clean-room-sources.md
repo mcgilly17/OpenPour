@@ -19,9 +19,8 @@ copyleft licences; porting their code would force their licence onto OpenPour.
 
 ## Consequences
 
-+ OpenPour stays MIT with no third-party code; every fact is tied to a fixture.
-− Facts not yet verified on hardware carry no public source in the repo.
-− **Open:** whether decompiling vendor apps is ever acceptable is deferred.
-  It is not done, and our own captures cover the need.
+- **Pro:** OpenPour stays MIT with no third-party code; every fact is tied to a fixture.
+- **Con:** Facts not yet verified on hardware carry no public source in the repo.
+- **Con:** **Open:** whether decompiling vendor apps is ever acceptable is deferred. It is not done, and our own captures cover the need.
 
 Rejected: adapting MIT-licensed code with credit; own captures only.

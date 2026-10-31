@@ -15,7 +15,7 @@ also runs on Node 22, 24 and 26. The package declares `engines.node >= 22`, the 
 
 ## Consequences
 
-- Proven toolchain for day-to-day work; supported runtimes are covered by tests.
-  − Moving development to Node 26 later is a separate step.
+- **Pro:** Proven toolchain for day-to-day work; supported runtimes are covered by tests.
+- **Con:** Moving development to Node 26 later is a separate step.
 
 Rejected: Node 26 as the development default.

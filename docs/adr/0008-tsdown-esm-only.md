@@ -17,9 +17,9 @@ browsers and every supported Node version consume ESM.
 
 ## Consequences
 
-- Today's standard, fast, and catches broken `exports` maps.
-  − tsdown is 0.x, so expect config churn.
-  − No CommonJS output.
+- **Pro:** Today's standard, fast, and catches broken `exports` maps.
+- **Con:** tsdown is 0.x, so expect config churn.
+- **Con:** No CommonJS output.
 
 Rejected: plain `tsc` emit; dual ESM + CJS; a source export condition for
 linked development.

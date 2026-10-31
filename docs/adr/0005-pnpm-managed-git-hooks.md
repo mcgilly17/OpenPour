@@ -18,7 +18,7 @@ The config belongs to this repo and changes independently of any consuming app.
 
 ## Consequences
 
-- Fast commits; broken pushes are rare. CI still enforces everything.
-  − Three dev dependencies. Contributors can bypass hooks with `--no-verify`.
+- **Pro:** Fast commits; broken pushes are rare. CI still enforces everything.
+- **Con:** Three dev dependencies. Contributors can bypass hooks with `--no-verify`.
 
 Rejected: Nix-managed hooks; no hooks (CI only); tests on pre-commit.

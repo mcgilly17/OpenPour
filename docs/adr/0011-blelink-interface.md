@@ -1,6 +1,6 @@
 # 0011. BleLink and Transport interface
 
-Status: Accepted · 2026-10-31
+Status: Superseded by 0017 · 2026-10-31
 
 ## Context
 
@@ -23,7 +23,7 @@ user pick a device after a tap. The published OpenPour protocol needs reads.
 
 ## Consequences
 
-- Covers Acaia, Web Bluetooth and native OpenPour scales with no further link changes.
-  − A bigger interface for each transport to implement.
+- **Pro:** Covers Acaia, Web Bluetooth and native OpenPour scales with no further link changes.
+- **Con:** A bigger interface for each transport to implement.
 
 Rejected: keeping three methods; adding methods only as each need arrives.

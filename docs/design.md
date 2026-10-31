@@ -13,127 +13,158 @@ style in [`docs/conventions.md`](conventions.md).
 
 ## Scope
 
-**In:** discover, connect, live weight, computed flow rate, tare, timer,
+**In:** scan filters, decoding live weight, computed flow rate, tare, timer,
 battery, capability flags, and one driver per brand.
 
-**Out (belongs to consuming apps):** pour and phase detection, recipes, brew
-sessions, storage and UI. Keeping the library small is what makes adoption easy.
+**Out (belongs to consuming apps):** all Bluetooth I/O, pour and phase
+detection, recipes, brew sessions, storage and UI. Keeping the library small is what makes adoption easy.
 
 ## Layout
 
 ```
 src/
-  core/                 Scale, Reading, flow filter, scanner, Clock, OpenPourError
+  core/                 session types, Reading, flow filter, OpenPourError
   drivers/acaia/        Pearl S, Lunar, Pyxis…
-  transports/ble-plx/   React Native (react-native-ble-plx, optional peer dep)
-  transports/replay/    plays fixtures back; platform-free
+  replay/               feeds fixtures into a session; used by tests
 fixtures/<brand>/       scrubbed JSONL captures (ADR 0013)
-spec/<brand>.md         protocol facts with sources (ADR 0015)
+spec/<brand>.md         protocol facts, each tied to a fixture (ADR 0015)
 ```
 
-Published as one package with subpath exports: `openpour`, `openpour/acaia`,
-`openpour/transports/ble-plx` and `openpour/transports/replay` (ADR 0007). `core/`, `drivers/` and
-`transports/replay/` use no platform APIs, and the compiler enforces it (ADR 0009).
+Published as one package with subpath exports: `openpour`, `openpour/acaia` and
+`openpour/replay` (ADR 0007). All of `src/` is platform-free, and the compiler
+enforces it (ADR 0009).
+
+## How it works (ADR 0017)
+
+OpenPour never touches Bluetooth. It is a translator: the app hands it bytes
+and the time they arrived, and it hands back events plus a to-do list.
+
+```
+app (owns Bluetooth)                         OpenPour (pure, synchronous)
+  scan, connect, discover GATT  ──gatt──────>  driver.createSession(gatt)
+  notification arrives          ──chr,bytes,t> session.receive(...)
+  timer fires at wakeAt         ──t─────────>  session.tick(t)
+  user taps Tare                ──t─────────>  session.tare(t)
+                                <──Step──────  { events, commands, wakeAt? }
+  run commands, publish events, schedule next tick
+```
 
 ## API
 
 ```ts
-// ── Setup and discovery ──────────────────────────────────
-const op = new OpenPour({ transport, drivers: [acaia], clock })  // clock optional
-
-for await (const ad of op.scan({ signal })) { … }   // native transports
-const ad = await op.pick()                           // Web Bluetooth, from a user gesture
-const scale = await op.connect(ad)
-
-// ── Scale ────────────────────────────────────────────────
-interface Scale {
-  readonly info: ScaleInfo
-  readonly capabilities: Capabilities
-  readonly state: ScaleState
-  readonly latest: Reading | undefined
-
-  onReading(fn: (r: Reading) => void): Unsubscribe        // primary (ADR 0010)
-  readings(opts?: { signal?: AbortSignal }): AsyncIterable<Reading>  // keeps the newest value only
-  on<K extends keyof ScaleEvents>(name: K, fn: (e: ScaleEvents[K]) => void): Unsubscribe
-
-  tare(): Promise<void>
-  timer: { start(): Promise<void>; stop(): Promise<void>; reset(): Promise<void> }
-  battery(): Promise<number>        // 0–100
-  disconnect(): Promise<void>
+// ── Driver: one per brand ───────────────────────────────
+interface Driver {
+  brand: string;
+  namePrefixes: string[]; // for the app's scan filter
+  services: string[]; // for the scan filter and Web Bluetooth optionalServices
+  matches?(ad: Advertisement): boolean; // refines a name match
+  createSession(gatt: GattLayout): ScaleSession; // gatt picks the protocol variant
 }
 
-type ScaleState = "connecting" | "connected" | "disconnected"
-interface ScaleEvents { state: ScaleState; disconnect: { cause?: unknown }; button: ButtonEvent; timer: TimerEvent }
-type Unsubscribe = () => void
+interface Advertisement {
+  name?: string;
+  serviceUuids?: string[];
+  manufacturerData?: Uint8Array;
+}
+type GattLayout = { uuid: string; characteristics: { uuid: string; properties: string[] }[] }[];
+
+// ── Session: a synchronous state machine per connected scale ──
+interface ScaleSession {
+  readonly info: ScaleInfo;
+  readonly capabilities: Capabilities;
+  start(t: number): Step; // after connecting
+  receive(chr: string, bytes: Uint8Array, t: number): Step; // every notification or read result
+  tick(t: number): Step; // at or after the last wakeAt
+  tare(t: number): Step;
+  timer: { start(t: number): Step; stop(t: number): Step; reset(t: number): Step };
+  requestBattery(t: number): Step;
+}
+
+interface Step {
+  events: ScaleEvent[];
+  commands: Command[];
+  wakeAt?: number; // call tick() at this time (heartbeats, handshake delays, timeouts)
+}
+
+type Command =
+  | { type: "subscribe"; svc: string; chr: string }
+  | { type: "write"; svc: string; chr: string; bytes: Uint8Array; mode: "response" | "noResponse" }
+  | { type: "read"; svc: string; chr: string };
+
+type ScaleEvent =
+  | { type: "reading"; reading: Reading }
+  | { type: "battery"; percent: number }
+  | { type: "button"; button: string }
+  | { type: "timer"; running: boolean; ms: number }
+  | { type: "state"; state: "handshaking" | "ready" }
+  | { type: "error"; error: OpenPourError };
 
 interface Reading {
-  t: number                // ms, from the injected Clock at receipt
-  grams: number            // signed; negative after tare is real data
-  stable: boolean          // the device's settled flag, or inferred
-  flowGramsPerSec: number  // computed by OpenPour
+  t: number; // ms, the arrival time the app passed in
+  grams: number; // signed; negative after tare is real data
+  stable: boolean; // the device's settled flag, or inferred
+  flowGramsPerSec: number; // computed by OpenPour
 }
 
-interface ScaleInfo { brand: string; model: string; firmware?: string; id: string }
-// id is opaque: a per-phone UUID on iOS, per-origin on Web Bluetooth. It is never a MAC.
+interface ScaleInfo {
+  brand: string;
+  model: string;
+  firmware?: string;
+}
 
 interface Capabilities {
-  tare: boolean; timer: boolean; battery: boolean
-  resolutionGrams: number   // e.g. 0.1
-  maxRateHz: number
-}
-
-// ── Time (ADR 0009) ─────────────────────────────────────
-interface Clock {
-  now(): number
-  setTimeout(fn: () => void, ms: number): unknown
-  clearTimeout(handle: unknown): void
+  tare: boolean;
+  timer: boolean;
+  battery: boolean;
+  resolutionGrams: number; // e.g. 0.1
+  maxRateHz: number;
 }
 
 // ── Errors (ADR 0012) ───────────────────────────────────
 class OpenPourError extends Error {
-  code: "unsupported" | "disconnected" | "timeout" | "not-found"
-      | "unknown-device" | "permission" | "busy" | "protocol"
-  cause?: unknown
-}
-
-// ── Driver: one per brand ───────────────────────────────
-interface Driver {
-  brand: string
-  namePrefixes: string[]        // used to build scan and pick filters
-  services: string[]            // also the Web Bluetooth optionalServices
-  matches?(ad: Advertisement): boolean     // refines a match
-  open(link: BleLink, ad: Advertisement, clock: Clock): Promise<Scale>
-}
-
-interface Advertisement { id: string; name?: string; rssi?: number; serviceUuids?: string[]; manufacturerData?: Uint8Array }
-
-// ── Transport and BleLink: one per platform (ADR 0011) ──────
-interface Transport {
-  scan?(filter: ScanFilter, signal?: AbortSignal): AsyncIterable<Advertisement>
-  pick?(filter: ScanFilter): Promise<Advertisement>
-  connect(ad: Advertisement): Promise<BleLink>
-}
-
-interface BleLink {
-  services(): Promise<{ uuid: string; characteristics: { uuid: string; properties: string[] }[] }[]>
-  read(svc: string, chr: string): Promise<Uint8Array>
-  notify(svc: string, chr: string, fn: (bytes: Uint8Array) => void): Promise<Unsubscribe>
-  write(svc: string, chr: string, bytes: Uint8Array, mode: "response" | "noResponse"): Promise<void>
-  requestMtu?(mtu: number): Promise<number>    // Android; iOS and web negotiate automatically
-  onDisconnect(fn: () => void): Unsubscribe
-  close(): Promise<void>
+  code: "unsupported" | "timeout" | "unknown-device" | "protocol";
+  cause?: unknown;
 }
 ```
+
+`tare()` and the timer methods throw `OpenPourError("unsupported")` when the
+capability is false. Everything else is reported as an `error` event.
+
+### App glue (any BLE library)
+
+```ts
+const session = driver.createSession(await device.discoverGatt());
+let timer: Handle | undefined;
+
+function apply(step: Step) {
+  for (const c of step.commands) {
+    if (c.type === "subscribe")
+      device.onNotify(c.svc, c.chr, (bytes, t) => apply(session.receive(c.chr, bytes, t)));
+    if (c.type === "write") device.write(c.svc, c.chr, c.bytes, c.mode);
+    if (c.type === "read")
+      device.read(c.svc, c.chr).then((bytes) => apply(session.receive(c.chr, bytes, now())));
+  }
+  for (const e of step.events) publish(e); // chart, recorder, UI
+  clearTimeout(timer);
+  if (step.wakeAt !== undefined)
+    timer = setTimeout(() => apply(session.tick(now())), step.wakeAt - now());
+}
+
+apply(session.start(now()));
+```
+
+`t` should be the arrival time, stamped as close to the radio as the BLE
+library allows. The app also owns permissions, reconnects and BLE timeouts.
 
 ### Design rules
 
 - **Flow is computed by OpenPour,** not read from the scale. The default is a 500 ms least-squares slope with a ±0.05 g deadband, both adjustable named constants. One calculation keeps curves comparable across brands.
-- **Time comes from the injected Clock** on arrival. Most scales send no timestamps, and 20–50 ms of BLE latency is fine for coffee.
-- **Missing features are reported, not faked.** If `capabilities.tare` is false, `tare()` throws `OpenPourError("unsupported")`. Capabilities can change after connecting, for example when a firmware check enables tare.
-- **Every BLE operation has a timeout.** Drivers reassemble frames that arrive split or merged across notifications.
-- **Disconnects are expected.** They emit `disconnect` and `state`, and the consuming app decides whether to reconnect.
-- **Two scales at once is free:** two `Scale` instances run side by side, and the app pairs readings by `t`.
-- **Supporting a native OpenPour scale needs only one more driver.** BleLink already covers every operation the protocol uses.
+- **Time is always passed in.** OpenPour has no clock or timers; `wakeAt` asks the app to call back. Most scales send no timestamps, so the app's arrival time is the reading's time.
+- **Missing features are reported, not faked.** Capabilities can change after the handshake, for example when a firmware check enables tare.
+- **Drivers reassemble frames** that arrive split or merged across notifications.
+- **Protocol timeouts are events.** A missed heartbeat reply surfaces from `tick` as an `error` event with code `timeout`; the app decides whether to reconnect.
+- **Two scales at once is free:** two sessions run side by side, and the app pairs readings by `t`.
+- **A native OpenPour scale is just another driver,** whose commands use the published service below.
 
 ## Acaia notes (all to verify on hardware)
 

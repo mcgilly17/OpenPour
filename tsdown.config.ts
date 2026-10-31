@@ -1,12 +1,7 @@
 import { defineConfig } from "tsdown";
 
 export default defineConfig({
-  entry: [
-    "src/index.ts",
-    "src/drivers/acaia/index.ts",
-    "src/transports/ble-plx/index.ts",
-    "src/transports/replay/index.ts",
-  ],
+  entry: ["src/index.ts", "src/drivers/acaia/index.ts", "src/replay/index.ts"],
   format: "esm",
   unbundle: true,
   fixedExtension: false,

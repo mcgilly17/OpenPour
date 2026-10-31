@@ -15,8 +15,8 @@ exported function and value has an explicit type.
 
 ## Consequences
 
-- Fast type checks; declarations can be emitted without the type checker (ADR 0008).
-- Consumers on any TypeScript version read the plain `.d.ts` output.
-  − Explicit return types on every export.
+- **Pro:** Fast type checks; declarations can be emitted without the type checker (ADR 0008).
+- **Pro:** Consumers on any TypeScript version read the plain `.d.ts` output.
+- **Con:** Explicit return types on every export.
 
 Rejected: staying on TypeScript 6; inferred export types.

@@ -1,4 +1,19 @@
 {
-  "files": [],
-  "references": [{ "path": "./tsconfig.core.json" }, { "path": "./tsconfig.transports.json" }]
+  "compilerOptions": {
+    "target": "ES2023",
+    "lib": ["ES2023"],
+    "types": [],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "verbatimModuleSyntax": true,
+    "erasableSyntaxOnly": true,
+    "isolatedDeclarations": true,
+    "declaration": true,
+    "noEmit": true,
+    "skipLibCheck": true
+  },
+  "include": ["src"]
 }

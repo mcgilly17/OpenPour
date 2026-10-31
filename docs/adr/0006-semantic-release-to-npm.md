@@ -18,9 +18,8 @@ Commits already follow conventional commits, which the hooks enforce (ADR 0005).
 
 ## Consequences
 
-- Fully automatic releases with no per-PR note files.
-  − A poor PR title gives the wrong version, which is mitigated by the title lint.
-  − **Open:** confirm that `@semantic-release/npm` supports npm trusted publishing
-  (OIDC, provenance) before the first publish.
+- **Pro:** Fully automatic releases with no per-PR note files.
+- **Con:** A poor PR title gives the wrong version, which is mitigated by the title lint.
+- **Con:** **Open:** confirm that `@semantic-release/npm` supports npm trusted publishing (OIDC, provenance) before the first publish.
 
 Rejected: changesets; release-please; manual releases.

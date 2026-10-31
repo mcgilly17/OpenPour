@@ -14,8 +14,8 @@ CI runs `biome ci`.
 
 ## Consequences
 
-- One dependency and one config, fast enough to run on every commit.
-- Works with TypeScript 7 today.
-  − Fewer rules than the ESLint plugin ecosystem.
+- **Pro:** One dependency and one config, fast enough to run on every commit.
+- **Pro:** Works with TypeScript 7 today.
+- **Con:** Fewer rules than the ESLint plugin ecosystem.
 
 Rejected: ESLint + Prettier.

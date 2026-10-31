@@ -16,8 +16,8 @@ only hard rules. Accepted ADRs are never edited; a new ADR supersedes an old one
 
 ## Consequences
 
-- Contributors can see why things are the way they are.
-- Agent rule files stay short.
-  − One more file per decision.
+- **Pro:** Contributors can see why things are the way they are.
+- **Pro:** Agent rule files stay short.
+- **Con:** One more file per decision.
 
 Rejected: decisions inside AGENTS.md; a shared folder outside the repo.

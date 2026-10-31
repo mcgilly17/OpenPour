@@ -16,7 +16,7 @@ co-located tests.
 
 ## Consequences
 
-- A consistent codebase, mostly enforced by Biome and the compiler.
-  − Two rules (interface vs type, units in names) rely on review.
+- **Pro:** A consistent codebase, mostly enforced by Biome and the compiler.
+- **Con:** Two rules (interface vs type, units in names) rely on review.
 
 Rejected: a lighter, tool-only set; default exports; `__tests__` folders.

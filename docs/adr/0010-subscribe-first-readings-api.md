@@ -1,6 +1,6 @@
 # 0010. Readings API: subscribe first
 
-Status: Accepted · 2026-10-31
+Status: Superseded by 0017 · 2026-10-31
 
 ## Context
 
@@ -18,8 +18,8 @@ to cancel from UI frameworks, and builds a backlog when a consumer is slow.
 
 ## Consequences
 
-- Fits effect cleanup; any number of consumers; zero dependencies.
-- Matches the push model of every BLE API we wrap.
-  − Stream composition (merge, throttle) is left to consumers.
+- **Pro:** Fits effect cleanup; any number of consumers; zero dependencies.
+- **Pro:** Matches the push model of every BLE API we wrap.
+- **Con:** Stream composition (merge, throttle) is left to consumers.
 
 Rejected: async iterable only; event emitter; RxJS observable; signals.

@@ -1,6 +1,6 @@
 # 0009. Platform-free core, enforced by the compiler
 
-Status: Accepted · 2026-10-31
+Status: Accepted · 2026-10-31 (Clock superseded by 0017)
 
 ## Context
 
@@ -20,8 +20,8 @@ time are platform APIs, not plain JavaScript.
 
 ## Consequences
 
-- Platform leaks are build errors, not review comments.
-- The injected Clock makes replay tests instant and deterministic.
-  − Two tsconfig projects to maintain.
+- **Pro:** Platform leaks are build errors, not review comments.
+- **Pro:** The injected Clock makes replay tests instant and deterministic.
+- **Con:** Two tsconfig projects to maintain.
 
 Rejected: a lint rule only; convention plus review.

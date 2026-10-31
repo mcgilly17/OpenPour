@@ -17,9 +17,9 @@ dependency, and the package sets `"sideEffects": false`.
 
 ## Consequences
 
-- One version, one changelog, one CI; linking is trivial.
-- Core users never install the React Native BLE library.
-  − All parts share one version number.
+- **Pro:** One version, one changelog, one CI; linking is trivial.
+- **Pro:** Core users never install the React Native BLE library.
+- **Con:** All parts share one version number.
 
 Rejected: a pnpm monorepo of scoped packages (revisit when a transport needs
 native code or its own release cadence).

@@ -21,7 +21,7 @@ on noisy signals. Replay must be deterministic and fast.
 
 ## Consequences
 
-- Tests focus where bugs actually happen; runs are instant and repeatable.
-  − fast-check is one extra dev dependency.
+- **Pro:** Tests focus where bugs actually happen; runs are instant and repeatable.
+- **Con:** fast-check is one extra dev dependency.
 
 Rejected: wall-clock replay; no coverage gate; hand-written split cases only.

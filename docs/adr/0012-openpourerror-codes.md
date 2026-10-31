@@ -17,7 +17,7 @@ timeout.
 
 ## Consequences
 
-- Reliable checks across duplicate installs; easy to map to UI text.
-  − A new code is a public API change and needs a release note.
+- **Pro:** Reliable checks across duplicate installs; easy to map to UI text.
+- **Con:** A new code is a public API change and needs a release note.
 
 Rejected: error subclasses; result values instead of throws.
