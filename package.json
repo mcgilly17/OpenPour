@@ -1,0 +1,64 @@
+{
+  "name": "openpour",
+  "version": "0.0.0",
+  "description": "One API for Bluetooth coffee scales.",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "packageManager": "pnpm@12.9.0",
+  "exports": {
+    ".": "./dist/index.js",
+    "./acaia": "./dist/drivers/acaia/index.js",
+    "./transports/ble-plx": "./dist/transports/ble-plx/index.js",
+    "./transports/replay": "./dist/transports/replay/index.js",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "dev": "tsdown --watch",
+    "typecheck": "tsc -b",
+    "lint": "biome ci .",
+    "format": "biome format --write .",
+    "test": "vitest run",
+    "validate": "pnpm lint && pnpm typecheck && pnpm test",
+    "release": "semantic-release",
+    "prepare": "husky"
+  },
+  "peerDependencies": {
+    "react-native-ble-plx": "^3.5.0"
+  },
+  "peerDependenciesMeta": {
+    "react-native-ble-plx": {
+      "optional": true
+    }
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,json}": [
+      "biome check --write --no-errors-on-unmatched"
+    ]
+  },
+  "devDependencies": {
+    "@arethetypeswrong/core": "0.18.5",
+    "@biomejs/biome": "2.6.4",
+    "@commitlint/cli": "21.2.4",
+    "@commitlint/config-conventional": "21.2.4",
+    "@semantic-release/github": "12.0.10",
+    "@semantic-release/npm": "13.2.0",
+    "@vitest/coverage-v8": "5.0.5",
+    "conventional-changelog-conventionalcommits": "10.4.1",
+    "husky": "9.1.7",
+    "lint-staged": "17.6.0",
+    "publint": "0.3.25",
+    "react-native-ble-plx": "3.5.1",
+    "semantic-release": "25.0.9",
+    "tsdown": "0.23.4",
+    "typescript": "7.0.2",
+    "vitest": "5.0.5"
+  }
+}

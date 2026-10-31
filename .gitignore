@@ -1,0 +1,15 @@
+node_modules/
+dist/
+coverage/
+.tsbuild/
+*.tsbuildinfo
+
+# Raw Bluetooth captures: import them with the capture script, never commit them
+*.pklg
+*.btsnoop
+*.cfa
+
+# Devenv / direnv
+.devenv*
+devenv.local.nix
+.direnv

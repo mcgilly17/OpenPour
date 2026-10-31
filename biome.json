@@ -1,0 +1,46 @@
+{
+  "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
+  "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
+  "files": { "includes": ["**", "!**/.tsbuild", "!**/fixtures/**/*.jsonl"] },
+  "formatter": { "indentStyle": "space", "lineWidth": 100 },
+  "linter": {
+    "rules": {
+      "preset": "recommended",
+      "style": {
+        "noNonNullAssertion": "error",
+        "noDefaultExport": "error",
+        "noEnum": "error"
+      }
+    }
+  },
+  "overrides": [
+    {
+      "includes": ["*.config.ts", "*.config.js"],
+      "linter": { "rules": { "style": { "noDefaultExport": "off" } } }
+    },
+    {
+      "includes": ["src/core/**", "src/drivers/**", "src/transports/replay/**", "src/index.ts"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "paths": {
+                  "react-native": "Core and drivers must stay platform-free. Platform code goes in src/transports.",
+                  "react-native-ble-plx": "Core and drivers must stay platform-free. Platform code goes in src/transports."
+                },
+                "patterns": [
+                  {
+                    "group": ["node:*"],
+                    "message": "Core and drivers must stay platform-free. Platform code goes in src/transports."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}
