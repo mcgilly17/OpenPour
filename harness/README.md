@@ -59,12 +59,14 @@ Fixtures never contain the browser's device ID.
 
 ## Troubleshooting
 
-| The page says                     | What to try                                                                                                                                                                  |
-| --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| isn't a secure context            | Open it at `http://localhost:<port>`, not a network address.                                                                                                                 |
-| This browser has no Web Bluetooth | Use Chrome or Edge; on Linux see the flag above.                                                                                                                             |
-| No scale was chosen               | The chooser was closed, or found nothing: check Bluetooth is on and allowed for the browser, and the scale is awake and not connected to a phone or another tab.             |
-| Couldn't connect                  | Wake the scale and bring it close. It accepts one connection at a time, so close vendor apps and other tabs. After a drop, wait about 15 s. The attempt gives up after 10 s. |
-| unknown-device                    | The scale connected but has none of the driver's services: a different scale, or a protocol variant the driver doesn't know yet.                                             |
-| … timed out after 3000 ms         | A Bluetooth operation stalled. The page moves on to the next command; if errors keep coming, disconnect and reconnect.                                                       |
-| disconnected, without a click     | The scale dropped the connection, slept, or `src/` was rebuilt and the page reloaded.                                                                                        |
+| The terminal or page says              | What to try                                                                                                                                                                       |
+| -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| waiting for a successful build of src/ | `src/` doesn't build, so there is no `dist/` to serve yet. Fix the error printed below the message; the page starts as soon as a build succeeds.                                  |
+| tsdown couldn't start building src/    | The build couldn't start at all, for example on a broken `tsdown.config.ts` or missing packages. Read the error after the message, run `pnpm install`, then `pnpm harness` again. |
+| isn't a secure context                 | Open it at `http://localhost:<port>`, not a network address.                                                                                                                      |
+| This browser has no Web Bluetooth      | Use Chrome or Edge; on Linux see the flag above.                                                                                                                                  |
+| No scale was chosen                    | The chooser was closed, or found nothing: check Bluetooth is on and allowed for the browser, and the scale is awake and not connected to a phone or another tab.                  |
+| Couldn't connect                       | Wake the scale and bring it close. It accepts one connection at a time, so close vendor apps and other tabs. After a drop, wait about 15 s. The attempt gives up after 10 s.      |
+| unknown-device                         | The scale connected but has none of the driver's services: a different scale, or a protocol variant the driver doesn't know yet.                                                  |
+| … timed out after 3000 ms              | A Bluetooth operation stalled. The page moves on to the next command; if errors keep coming, disconnect and reconnect.                                                            |
+| disconnected, without a click          | The scale dropped the connection, slept, or `src/` was rebuilt and the page reloaded.                                                                                             |

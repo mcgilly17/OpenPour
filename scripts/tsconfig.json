@@ -1,5 +1,6 @@
 {
   "extends": "../tsconfig.json",
-  "compilerOptions": { "types": ["node"] },
+  // Node runs these files by stripping their types, so relative imports name the .ts file itself.
+  "compilerOptions": { "types": ["node"], "allowImportingTsExtensions": true },
   "include": ["."]
 }
