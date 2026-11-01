@@ -13,3 +13,6 @@ coverage/
 devenv.local.nix
 devenv.local.yaml
 .direnv
+
+# Claude Code agent worktrees
+.claude/worktrees/

@@ -25,7 +25,7 @@
     "typecheck": "tsc && tsc -p harness && tsc -p harness/web && tsc -p scripts",
     "lint": "biome ci .",
     "format": "biome format --write .",
-    "test": "vitest run",
+    "test": "vitest run --exclude '.claude/**'",
     "validate": "pnpm lint && pnpm build && pnpm typecheck && pnpm test",
     "release": "semantic-release",
     "prepare": "husky"
