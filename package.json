@@ -21,7 +21,8 @@
   "scripts": {
     "build": "tsdown",
     "dev": "tsdown --watch",
-    "typecheck": "tsc && tsc -p harness",
+    "harness": "node scripts/harness.ts",
+    "typecheck": "tsc && tsc -p harness && tsc -p harness/web && tsc -p scripts",
     "lint": "biome ci .",
     "format": "biome format --write .",
     "test": "vitest run",
@@ -41,6 +42,8 @@
     "@commitlint/config-conventional": "21.2.4",
     "@semantic-release/github": "12.0.10",
     "@semantic-release/npm": "13.2.0",
+    "@types/node": "26.6.6",
+    "@types/web-bluetooth": "0.0.21",
     "@vitest/coverage-v8": "5.0.5",
     "conventional-changelog-conventionalcommits": "10.4.1",
     "fast-check": "4.10.2",
@@ -50,6 +53,7 @@
     "semantic-release": "25.0.9",
     "tsdown": "0.23.4",
     "typescript": "7.0.2",
+    "vite": "8.3.5",
     "vitest": "5.0.5"
   }
 }

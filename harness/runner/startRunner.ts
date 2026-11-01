@@ -61,9 +61,17 @@ export function startRunner({ source, session, clock, onEvent }: RunnerOptions):
 
   // Commands are queued before events go out, so a listener reacting to an event can't jump the queue.
   function apply(step: Step, t: number): void {
-    for (const command of step.commands) queue = queue.then(() => execute(command));
+    for (const command of step.commands) queue = queue.then(() => execute(command)).catch(rethrow);
     replaceWake(step.wakeAt);
     for (const event of step.events) onEvent({ type: "scale", t, event });
+  }
+
+  // A listener that throws while a command fails must not stall the queue, nor vanish: report it
+  // the way an error thrown from a timer is reported.
+  function rethrow(error: unknown): void {
+    clock.schedule(() => {
+      throw error;
+    }, 0);
   }
 
   function replaceWake(wakeAt: number | undefined): void {

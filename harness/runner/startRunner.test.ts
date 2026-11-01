@@ -211,6 +211,26 @@ describe("startRunner failures", () => {
       expect(session.receive).not.toHaveBeenCalled();
     },
   );
+
+  test("keeps running commands when a listener throws on a failure, and still surfaces its error", async () => {
+    const listenerBug = new Error("listener bug");
+    const clock = useFakeClock();
+    const source = createFakeSource(clock, (call) =>
+      call.type === "write" ? {} : { error: FAILURE },
+    );
+    startRunner({
+      source,
+      session: stubSession(step([READ, WRITE, WRITE_WITH_RESPONSE])),
+      clock,
+      onEvent(event) {
+        if (event.type === "commandFailed") throw listenerBug;
+      },
+    });
+
+    await expect(vi.advanceTimersByTimeAsync(0)).rejects.toBe(listenerBug);
+
+    expect(source.calls).toEqual([READ, WRITE, WRITE_WITH_RESPONSE]);
+  });
 });
 
 describe("startRunner disconnect", () => {

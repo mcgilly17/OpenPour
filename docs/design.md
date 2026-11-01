@@ -30,10 +30,14 @@ fixtures/<brand>/       scrubbed JSONL captures (ADR 0013)
 spec/<brand>.md         protocol facts, each tied to a fixture (ADR 0015)
 harness/                dev-only live harness, never published
   runner/               Bluetooth source port, session runner, recorder, fake source
+  web/                  Web Bluetooth source and the browser page
+scripts/                dev-only Node scripts: the harness launcher, packaging check
 ```
 
 The harness uses OpenPour only through its package exports, as any consumer
 would, so `pnpm validate` builds `dist/` before typechecking and testing it.
+`pnpm harness` builds and watches those exports and serves the page; see
+[`harness/README.md`](../harness/README.md) for prerequisites and troubleshooting.
 
 Published as one package with subpath exports: `openpour`, `openpour/acaia` and
 `openpour/replay` (ADR 0007). All of `src/` is platform-free, and the compiler

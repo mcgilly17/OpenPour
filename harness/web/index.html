@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>OpenPour harness</title>
+    <link rel="icon" href="data:," />
+    <style>
+      body { font: 15px/1.4 system-ui, sans-serif; margin: 1rem; max-width: 60rem; }
+      .problem { color: #b00020; }
+      #scales { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(22rem, 1fr)); }
+      .scale { border: 1px solid #ccc; border-radius: 6px; padding: 0 1rem 1rem; }
+      dl { display: grid; grid-template-columns: max-content 1fr; gap: 0.25rem 1rem; }
+      dt { color: #555; }
+      dd { margin: 0; }
+      [data-field="weight"] { font-size: 1.5rem; font-variant-numeric: tabular-nums; }
+      form { display: grid; grid-template-columns: max-content 1fr; gap: 0.25rem 0.5rem; margin-top: 1rem; }
+      label { display: contents; }
+      form button { grid-column: span 2; justify-self: start; }
+      ol { padding-left: 1.25rem; }
+    </style>
+  </head>
+  <body>
+    <h1>OpenPour web harness</h1>
+    <p>
+      Connect one or two scales, then export a fixture for each. See
+      <code>harness/README.md</code> for prerequisites and troubleshooting.
+    </p>
+    <p id="support-problem" class="problem" hidden></p>
+    <button id="connect" type="button">Connect a scale</button>
+    <p id="connect-problem" class="problem" hidden></p>
+    <div id="scales"></div>
+
+    <template id="scale-panel">
+      <section class="scale">
+        <h2 data-field="title">Scale</h2>
+        <dl>
+          <dt>Connection</dt>
+          <dd data-field="connection"></dd>
+          <dt>Protocol</dt>
+          <dd data-field="protocol">–</dd>
+          <dt>Scale</dt>
+          <dd data-field="info">–</dd>
+          <dt>Capabilities</dt>
+          <dd data-field="capabilities">–</dd>
+          <dt>Weight</dt>
+          <dd data-field="weight">–</dd>
+        </dl>
+        <button type="button" data-action="tare">Tare</button>
+        <button type="button" data-action="disconnect">Disconnect</button>
+        <button type="button" data-action="reconnect">Reconnect</button>
+        <form>
+          <label>Model <input name="model" value="unknown" required /></label>
+          <label>
+            Model year
+            <input
+              name="modelYear"
+              value="unknown"
+              required
+              pattern="\d{4}|unknown"
+              title="A year like 2021, or unknown"
+            />
+          </label>
+          <label>Firmware <input name="firmware" value="unknown" required /></label>
+          <label>Scenario <input name="scenario" required placeholder="e.g. tare-then-pour" /></label>
+          <button type="submit">Export fixture</button>
+        </form>
+        <h3>Errors</h3>
+        <ol data-field="errors"></ol>
+      </section>
+    </template>
+
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>
