@@ -24,6 +24,8 @@ export const ACAIA_VECTORS = {
   weightTooShort: "efdd0c0305000305",
   /** built: the weight bytes contain the frame header; 5681.5 g. */
   weightContainingHeader: "efdd0c0805efdd00000100f8e2",
+  /** captured: heartbeat reply carrying −598.0 g. */
+  ackWithNegativeWeight: "efdd0c0b0b00e0055c17000001022948",
   /** built: timer 90.5 s. */
   timer: "efdd0c0507011e050b25",
   /** built: a bare heartbeat reply. */

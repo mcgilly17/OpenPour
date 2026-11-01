@@ -193,8 +193,13 @@ Verified facts move into `spec/acaia.md`, each tied to the fixture that proves i
   - type 8, settings (battery is `b1 & 0x7F`);
   - type 12, events: 5 weight, 7 timer, 8 button, 11 heartbeat reply.
 - **Weight:** a little-endian value in bytes 0–2 (byte 3 not yet known), a decimals byte (divide by 10^n, n = 1–4), and sign bit `0x02` in byte 5. Events chain records: tag 5 weight (6 bytes), 6 battery (1), 7 timer (3: minutes, seconds, tenths), 8 button (1: `00` tare, `08` start, `09` reset, `0A` stop), 11 heartbeat reply (2).
-- **Handshake:** subscribe, wait about 100 ms, identify, wait about 100 ms, then the notification request.
-- **Heartbeat:** about every 1 s on new style and about every 5 s on old style. Keep it as a named constant per variant.
+- **Identify:** the scale appears to ignore the 15 bytes. ASCII `012345678901234` is the most widely used choice for both styles.
+- **Handshake:** subscribe, identify, then the notification request. No delays are strictly needed, but a short wait (about 100 ms) after subscribing is common. An inbound type 7 frame means "not identified yet": send identify again. No settings request is needed.
+- **MTU:** request 247 after connecting; the Pyxis is reported to need it. This is the app's job.
+- **Heartbeat:** every 1–2 s on new style; old style is reported at up to 5 s. Re-send the notification request with each heartbeat, since scales may drop it. Keep the interval as a named constant per variant.
+- **Write mode:** old style writes without response.
+- **Heartbeat reply:** type 12 tag 11 carries 2 unknown bytes and is often followed by a weight or timer record in the same frame.
+- **Open questions, captures only:** which bit marks a settled weight (bit `0x01` of byte 5 is unused by every known decoder), and whether weights arrive in ounces when the scale is set to ounces (settings byte 2: `02` grams, `05` ounces).
 - **Connections:** after a drop, wait about 15 s before reconnecting. The scale accepts only one connection at a time.
 - **Lunar 2021:** tare and timer need current firmware. Only 2021+ models report the timer state.
 - **Lunar model year:** check whether a given Lunar is a 2021 or 2025 model; the protocols may differ.

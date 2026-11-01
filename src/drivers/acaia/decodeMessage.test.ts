@@ -65,6 +65,7 @@ describe("decodeMessage: timer, ack, battery", () => {
 
   test("skips heartbeat replies but keeps what follows", () => {
     expect(records("ack")).toEqual([]);
+    expect(records("ackWithNegativeWeight")).toEqual([{ kind: "weight", grams: -598 }]);
     expect(records("ackWithWeightAndTimer")).toEqual([
       { kind: "weight", grams: 175.9 },
       { kind: "timer", ms: 90_500 },
