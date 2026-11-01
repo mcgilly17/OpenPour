@@ -74,7 +74,10 @@ export function createRecorder({ startT, label }: RecorderOptions): Recorder {
     },
     export(details) {
       const header = headerOf(details, label, sessionStartT);
-      const jsonl = `${[header, ...records].map((line) => JSON.stringify(line)).join("\n")}\n`;
+      // A write arrives once it succeeds, after packets received while it was in flight. The sort
+      // is stable, so packets with the same time keep their order.
+      const inTimeOrder = records.toSorted((a, b) => a.t - b.t);
+      const jsonl = `${[header, ...inTimeOrder].map((line) => JSON.stringify(line)).join("\n")}\n`;
       parseFixture(jsonl);
       const name = [header.model, `fw${header.firmware}`, header.scenario].map(fileNamePart);
       return { fileName: `${name.join("_")}.jsonl`, jsonl };

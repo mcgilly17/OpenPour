@@ -49,8 +49,10 @@ scale the same way.
 The recording starts with the first connection, and every scale's fixture
 counts time from that moment so two scales line up. Each fixture's header also
 notes when its session started (`sessionStartT`, ADR 0018), so replay sends the
-session's handshake and heartbeats at their recorded times. Each connection
-records its own traffic: **Reconnect** starts a fresh session and a new
+session's handshake and heartbeats at their recorded times. A fixture holds
+every notification and read result, and every write that succeeded, timed when
+it was sent. A failed write is listed under the panel's errors and left out of
+the fixture. Each connection records its own traffic: **Reconnect** starts a fresh session and a new
 recording, so export first. To export, fill in model, model year and firmware
 (leave `unknown` when you don't know) and a scenario, then **Export fixture**.
 Fixtures never contain the browser's device ID.

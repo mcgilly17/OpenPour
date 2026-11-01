@@ -60,6 +60,21 @@ describe("createRecorder", () => {
     ]);
   });
 
+  test("keeps records in time order when a write is added after packets that arrived during it", () => {
+    const recorder = createRecorder({ startT: 0, label: "a" });
+    recorder.add({ t: 30, dir: "rx", svc: "s", chr: "n", bytes: Uint8Array.of(0x01) });
+    recorder.add({ t: 10, dir: "tx", svc: "s", chr: "w", bytes: Uint8Array.of(0x02) });
+    recorder.add({ t: 30, dir: "rx", svc: "s", chr: "n", bytes: Uint8Array.of(0x03) });
+
+    const records = parseFixture(recorder.export(DETAILS).jsonl).records;
+
+    expect(records.map(({ t, hex }) => [t, hex])).toEqual([
+      [10, "02"],
+      [30, "01"],
+      [30, "03"],
+    ]);
+  });
+
   test("exports only ADR 0013 header fields, named per scale", () => {
     const withDeviceId = { ...DETAILS, modelYear: 2023, deviceId: "temporary-id" };
 

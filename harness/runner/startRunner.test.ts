@@ -144,6 +144,33 @@ describe("startRunner input and output", () => {
     expect(session.receive).toHaveBeenCalledExactlyOnceWith(READ.chr, bytes, 50);
   });
 
+  test("reports a write's packet once the write succeeds, stamped with when it was sent", async () => {
+    const { clock, events } = run(stubSession(step([WRITE])), () => ({ delayMs: 50 }));
+
+    await advanceTo(clock, 49);
+    expect(events.filter(({ type }) => type === "packet")).toEqual([]);
+    await advanceTo(clock, 50);
+
+    const packet = {
+      t: 0,
+      dir: "tx",
+      svc: SVC,
+      chr: "Chr-Write",
+      bytes: Uint8Array.of(0xef, 0xdd),
+    };
+    expect(events.filter(({ type }) => type === "packet")).toEqual([{ type: "packet", packet }]);
+  });
+
+  test("reports no packet for a write that fails", async () => {
+    const outcome = { delayMs: 50, error: FAILURE };
+    const { clock, events } = run(stubSession(step([WRITE])), () => outcome);
+
+    await advanceTo(clock, 50);
+
+    expect(events.filter(({ type }) => type === "packet")).toEqual([]);
+    expect(events).toContainEqual({ type: "commandFailed", t: 50, command: WRITE, error: FAILURE });
+  });
+
   test("lets each step replace the pending wake-up, and a step without one cancel it", async () => {
     const session = stubSession(step([SUBSCRIBE], 1000));
     session.receive.mockReturnValueOnce(step([], 500)).mockReturnValueOnce(step());

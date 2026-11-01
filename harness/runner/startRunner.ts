@@ -2,7 +2,12 @@ import type { Command, ScaleEvent, ScaleSession, Step } from "openpour";
 import type { BluetoothSource } from "./BluetoothSource.js";
 import type { Clock } from "./Clock.js";
 
-/** One packet as it crossed the radio, never split or merged. */
+/**
+ * One packet as it crossed the radio, never split or merged: every notification and read result,
+ * and every write that succeeded. A write's `t` is when it was sent, but it is reported once the
+ * write resolves, so it can follow packets that arrived in the meantime. A failed write is
+ * reported as `commandFailed` instead, with no packet.
+ */
 export interface Packet {
   t: number;
   dir: "tx" | "rx";
@@ -107,9 +112,12 @@ export function startRunner({ source, session, clock, onEvent }: RunnerOptions):
     switch (command.type) {
       case "subscribe":
         return source.subscribe(command.svc, command.chr, (bytes, t) => receive(command, bytes, t));
-      case "write":
-        packet("tx", command, command.bytes, clock.now());
-        return source.write(command.svc, command.chr, command.bytes, command.mode);
+      case "write": {
+        const t = clock.now();
+        await source.write(command.svc, command.chr, command.bytes, command.mode);
+        if (!isClosed) packet("tx", command, command.bytes, t);
+        return;
+      }
       case "read": {
         const bytes = await source.read(command.svc, command.chr);
         return receive(command, bytes, clock.now());
