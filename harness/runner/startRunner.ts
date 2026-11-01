@@ -24,6 +24,7 @@ export interface RunnerOptions {
   source: BluetoothSource;
   session: ScaleSession;
   clock: Clock;
+  /** Gets every event. If it throws, the runner carries on and rethrows the error from a timer. */
   onEvent: (event: RunnerEvent) => void;
 }
 
@@ -55,25 +56,31 @@ export function startRunner({ source, session, clock, onEvent }: RunnerOptions):
     try {
       step = run(t);
     } catch (error) {
-      onEvent({ type: "sessionThrew", t, error });
+      emit({ type: "sessionThrew", t, error });
       return;
     }
     apply(step, t);
   }
 
   // Commands are queued before events go out, so a listener reacting to an event can't jump the queue.
+  // The queue never rejects: execute() reports every failure itself.
   function apply(step: Step, t: number): void {
-    for (const command of step.commands) queue = queue.then(() => execute(command)).catch(rethrow);
+    for (const command of step.commands) queue = queue.then(() => execute(command));
     replaceWake(step.wakeAt);
-    for (const event of step.events) onEvent({ type: "scale", t, event });
+    for (const event of step.events) emit({ type: "scale", t, event });
   }
 
-  // A listener that throws while a command fails must not stall the queue, nor vanish: report it
-  // the way an error thrown from a timer is reported.
-  function rethrow(error: unknown): void {
-    clock.schedule(() => {
-      throw error;
-    }, 0);
+  // On every path, a listener that throws must not change what the runner does: commands and
+  // wake-ups already scheduled still need this runner to stop them. Nor may the error vanish: it is
+  // reported the way an error thrown from a timer is.
+  function emit(event: RunnerEvent): void {
+    try {
+      onEvent(event);
+    } catch (error) {
+      clock.schedule(() => {
+        throw error;
+      }, 0);
+    }
   }
 
   function replaceWake(wakeAt: number | undefined): void {
@@ -92,7 +99,7 @@ export function startRunner({ source, session, clock, onEvent }: RunnerOptions):
     try {
       await perform(command);
     } catch (error) {
-      if (!isClosed) onEvent({ type: "commandFailed", t: clock.now(), command, error });
+      if (!isClosed) emit({ type: "commandFailed", t: clock.now(), command, error });
     }
   }
 
@@ -117,7 +124,7 @@ export function startRunner({ source, session, clock, onEvent }: RunnerOptions):
   }
 
   function packet(dir: Packet["dir"], { svc, chr }: Characteristic, bytes: Uint8Array, t: number) {
-    onEvent({ type: "packet", packet: { t, dir, svc, chr, bytes } });
+    emit({ type: "packet", packet: { t, dir, svc, chr, bytes } });
   }
 
   function close(): void {
@@ -125,12 +132,12 @@ export function startRunner({ source, session, clock, onEvent }: RunnerOptions):
     isClosed = true;
     cancelWake?.();
     cancelWake = undefined;
-    onEvent({ type: "disconnected", t: clock.now() });
+    emit({ type: "disconnected", t: clock.now() });
   }
 
   source.onDisconnect(close);
   const startT = clock.now();
-  onEvent({ type: "started", t: startT });
+  emit({ type: "started", t: startT });
   call((t) => session.start(t), startT);
 
   return {

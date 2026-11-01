@@ -232,6 +232,35 @@ describe("startRunner failures", () => {
 
     expect(source.calls).toEqual([READ, WRITE, WRITE_WITH_RESPONSE]);
   });
+
+  // The start step's commands and wake-up are already scheduled when its events go out, so the
+  // runner must come back: its handle is the only way to stop driving the scale.
+  test("hands back a runner that can disconnect when a listener throws on the first scale event", async () => {
+    const listenerBug = new Error("listener bug");
+    const handshaking = { type: "state", state: "handshaking" } as const;
+    const session = stubSession({
+      events: [handshaking],
+      commands: [SUBSCRIBE, WRITE],
+      wakeAt: 1000,
+    });
+    const clock = useFakeClock();
+    const source = createFakeSource(clock);
+
+    const runner = startRunner({
+      source,
+      session,
+      clock,
+      onEvent(event) {
+        if (event.type === "scale") throw listenerBug;
+      },
+    });
+    await expect(vi.advanceTimersByTimeAsync(0)).rejects.toBe(listenerBug);
+    await runner.disconnect();
+    await advanceTo(clock, 5000);
+
+    expect(source.calls).toEqual([SUBSCRIBE, WRITE, { type: "disconnect" }]);
+    expect(session.tick).not.toHaveBeenCalled();
+  });
 });
 
 describe("startRunner disconnect", () => {
