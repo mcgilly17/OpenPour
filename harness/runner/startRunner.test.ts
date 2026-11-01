@@ -300,6 +300,9 @@ describe("startRunner disconnect", () => {
     await advanceTo(clock, 50);
     source.drop();
     source.drop();
+    // The subscription has settled and the wake-up isn't due: nothing may be left to fire.
+    await advanceTo(clock, 999);
+    expect(vi.getTimerCount()).toBe(0);
     await advanceTo(clock, 5000);
 
     expect(session.tick).not.toHaveBeenCalled();
@@ -311,6 +314,7 @@ describe("startRunner disconnect", () => {
 
   test.each<[string, Command, FakeOutcome]>([
     ["a read result", READ, { delayMs: 100, bytes: Uint8Array.of(1) }],
+    ["a write success", WRITE, { delayMs: 100 }],
     ["a write failure", WRITE, { delayMs: 100, error: FAILURE }],
   ])("ignores %s and notifications from the old connection", async (_, inFlight, outcome) => {
     const session = stubSession(step([SUBSCRIBE, inFlight], 1000));
@@ -329,12 +333,17 @@ describe("startRunner disconnect", () => {
     expect(events).toHaveLength(seen);
   });
 
-  test("disconnect() closes the connection and turns every control off", async () => {
+  test("disconnect() turns every control off at once, before the platform reports the drop", async () => {
+    // Like Chrome's gattserverdisconnected, the drop arrives as a later task: here, after the wake-up.
+    const dropDelayMs = 5000;
     const session = stubSession(step([SUBSCRIBE], 1000));
-    const { clock, source, events, runner } = run(session);
+    const { clock, source, events, runner } = run(session, (call) =>
+      call.type === "disconnect" ? { delayMs: dropDelayMs } : {},
+    );
+    const disconnected = () => events.filter(({ type }) => type === "disconnected");
     await advanceTo(clock, 10);
 
-    await runner.disconnect();
+    const closing = runner.disconnect();
     runner.tare();
     runner.requestBattery();
     await advanceTo(clock, 2000);
@@ -343,9 +352,11 @@ describe("startRunner disconnect", () => {
     expect(session.tare).not.toHaveBeenCalled();
     expect(session.requestBattery).not.toHaveBeenCalled();
     expect(session.tick).not.toHaveBeenCalled();
-    expect(events.filter(({ type }) => type === "disconnected")).toEqual([
-      { type: "disconnected", t: 10 },
-    ]);
+    expect(disconnected()).toEqual([{ type: "disconnected", t: 10 }]);
+
+    await advanceTo(clock, 10 + dropDelayMs);
+    await closing;
+    expect(disconnected()).toHaveLength(1);
   });
 });
 
