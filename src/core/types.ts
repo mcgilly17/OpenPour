@@ -38,7 +38,10 @@ export type ScaleEvent =
   | { type: "state"; state: "handshaking" | "ready" }
   | { type: "error"; error: OpenPourError };
 
-/** The result of every session call: what happened, what to do, and when to call tick() next. */
+/**
+ * The result of every session call: what happened, what to do, and when to call tick() next.
+ * Each step replaces any pending wake-up, so a session that still needs one must set `wakeAt` again.
+ */
 export interface Step {
   events: ScaleEvent[];
   commands: Command[];
