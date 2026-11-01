@@ -28,7 +28,12 @@ src/
   replay/               feeds fixtures into a session; used by tests
 fixtures/<brand>/       scrubbed JSONL captures (ADR 0013)
 spec/<brand>.md         protocol facts, each tied to a fixture (ADR 0015)
+harness/                dev-only live harness, never published
+  runner/               Bluetooth source port, session runner, recorder, fake source
 ```
+
+The harness uses OpenPour only through its package exports, as any consumer
+would, so `pnpm validate` builds `dist/` before typechecking and testing it.
 
 Published as one package with subpath exports: `openpour`, `openpour/acaia` and
 `openpour/replay` (ADR 0007). All of `src/` is platform-free, and the compiler

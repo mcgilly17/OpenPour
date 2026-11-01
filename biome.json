@@ -53,6 +53,27 @@
           }
         }
       }
+    },
+    {
+      "includes": ["harness/**", "!harness/**/*.test.ts", "!harness/test/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "paths": {},
+                "patterns": [
+                  {
+                    "group": ["**/src/**"],
+                    "message": "The harness uses OpenPour like any consumer: import openpour, openpour/acaia or openpour/replay."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
     }
   ]
 }
