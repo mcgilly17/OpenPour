@@ -127,6 +127,22 @@ describe("replay", () => {
     }
   });
 
+  test("starts the session at the header's session start when it has one", () => {
+    const recorded = fixture(rx(400, "01"), tx(1000, "efdd00"), tx(2000, "efdd00"));
+    const header = { ...recorded.header, sessionStartT: 0 };
+
+    const result = replay(fakeSession(), { ...recorded, header });
+
+    expect(result.commands[0]).toEqual({
+      t: 0,
+      command: { type: "subscribe", svc: "s", chr: "n" },
+    });
+    const ticks = result.commands
+      .filter(({ command }) => command.type === "write")
+      .map(({ t }) => t);
+    expect(ticks).toEqual([1000, 2000]);
+  });
+
   test("replays an empty fixture as just the start step", () => {
     expect(replay(fakeSession(), fixture()).events).toHaveLength(1);
   });

@@ -14,8 +14,9 @@
 | [0010](0010-subscribe-first-readings-api.md)       | Readings API: subscribe first                | Superseded by 0017           |
 | [0011](0011-blelink-interface.md)                  | BleLink and Transport interface              | Superseded by 0017           |
 | [0012](0012-openpourerror-codes.md)                | One error type with codes                    | Accepted                     |
-| [0013](0013-jsonl-fixtures.md)                     | Scrubbed JSONL fixtures                      | Accepted                     |
+| [0013](0013-jsonl-fixtures.md)                     | Scrubbed JSONL fixtures                      | Accepted (amended by 0018)   |
 | [0014](0014-test-strategy.md)                      | Test strategy                                | Accepted                     |
 | [0015](0015-clean-room-sources.md)                 | Clean-room protocol work                     | Accepted (open: decompiling) |
 | [0016](0016-coding-conventions.md)                 | Coding conventions                           | Accepted                     |
 | [0017](0017-sans-io-core.md)                       | Sans-I/O core                                | Accepted                     |
+| [0018](0018-session-start-in-fixtures.md)          | Session start in fixture headers             | Accepted                     |

@@ -26,10 +26,10 @@ function showScaleEvent(panel: ScalePanel, event: ScaleEvent): void {
   if (event.type === "error") panel.addError(`Scale error ${describeError(event.error)}`);
 }
 
-/** Shows what the runner reports; packets go to the recorder instead. */
+/** Shows what the runner reports; the start time and packets go to the recorder instead. */
 export function showRunnerEvent(
   panel: ScalePanel,
-  event: Exclude<RunnerEvent, { type: "packet" }>,
+  event: Exclude<RunnerEvent, { type: "started" | "packet" }>,
 ): void {
   switch (event.type) {
     case "scale":

@@ -10,6 +10,8 @@ export interface FixtureHeader {
   tool: string;
   scenario: string;
   scrubbed: true;
+  /** When `session.start` was called, on the records' time base (ADR 0018). */
+  sessionStartT?: number;
 }
 
 export interface FixtureRecord {
@@ -34,7 +36,13 @@ const REQUIRED_STRING_KEYS = [
   "tool",
   "scenario",
 ] as const;
-const HEADER_KEYS = new Set<string>(["v", "modelYear", "scrubbed", ...REQUIRED_STRING_KEYS]);
+const HEADER_KEYS = new Set<string>([
+  "v",
+  "modelYear",
+  "scrubbed",
+  "sessionStartT",
+  ...REQUIRED_STRING_KEYS,
+]);
 // A hardware address in a public fixture means the capture wasn't scrubbed (ADR 0013).
 const MAC_ADDRESS = /([0-9a-f]{2}:){5}[0-9a-f]{2}/i;
 const HEX = /^(?:[0-9a-f]{2})*$/i;
@@ -69,7 +77,21 @@ function checkHeader(value: Record<string, unknown>): FixtureHeader {
   if (value.modelYear !== undefined && typeof value.modelYear !== "number") {
     fail(1, `header "modelYear" must be a number`);
   }
+  // Number.isFinite never coerces, so it rejects strings, and JSON's 1e999 (Infinity) too.
+  if (value.sessionStartT !== undefined && !Number.isFinite(value.sessionStartT)) {
+    fail(1, `header "sessionStartT" must be a finite number`);
+  }
   return value as unknown as FixtureHeader;
+}
+
+// Replay starts the session at sessionStartT, so a record before it would reach the session first.
+function checkSessionStart(fixture: Fixture): Fixture {
+  const { sessionStartT } = fixture.header;
+  const first = fixture.records[0];
+  if (sessionStartT !== undefined && first !== undefined && sessionStartT > first.t) {
+    fail(1, `header "sessionStartT" is after the first record`);
+  }
+  return fixture;
 }
 
 function checkRecord(value: Record<string, unknown>, line: number): FixtureRecord {
@@ -89,8 +111,8 @@ export function parseFixture(jsonl: string): Fixture {
   const lines = jsonl.split("\n").filter((line) => line.trim() !== "");
   const [first, ...rest] = lines;
   if (first === undefined) throw new OpenPourError("protocol", "fixture is empty");
-  return {
+  return checkSessionStart({
     header: checkHeader(parseLine(first, 1)),
     records: rest.map((text, i) => checkRecord(parseLine(text, i + 2), i + 2)),
-  };
+  });
 }

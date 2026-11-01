@@ -1,8 +1,16 @@
-import { acaia } from "openpour/acaia";
-import { hexToBytes, parseFixture, replay, type TimedEvent } from "openpour/replay";
+import { acaia, NEW_STYLE_HEARTBEAT_MS, SUBSCRIBE_SETTLE_MS } from "openpour/acaia";
+import {
+  bytesToHex,
+  type FixtureRecord,
+  hexToBytes,
+  parseFixture,
+  type ReplayResult,
+  replay,
+  type TimedEvent,
+} from "openpour/replay";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
-import { ACAIA_VECTORS as RX } from "../../src/test/acaiaVectors.js";
+import { ACAIA_VECTORS as RX, ACAIA_COMMAND_VECTORS as TX } from "../../src/test/acaiaVectors.js";
 import { ACAIA_GATT, ACAIA_NOTIFY, ACAIA_SVC } from "../test/acaiaGatt.js";
 import { advanceTo, useFakeClock } from "../test/useFakeClock.js";
 import { createFakeSource } from "./createFakeSource.js";
@@ -27,6 +35,15 @@ afterEach(() => {
 function relativeTo(startT: number, { t, event }: TimedEvent): TimedEvent {
   if (event.type !== "reading") return { t: t - startT, event };
   return { t: t - startT, event: { ...event, reading: { ...event.reading, t: t - startT } } };
+}
+
+/** The session's writes during replay, shaped like the fixture's "tx" records. */
+function replayedWrites({ commands }: ReplayResult): FixtureRecord[] {
+  return commands.flatMap(({ t, command }) =>
+    command.type === "write"
+      ? [{ t, dir: "tx", svc: command.svc, chr: command.chr, hex: bytesToHex(command.bytes) }]
+      : [],
+  );
 }
 
 describe("createRecorder", () => {
@@ -103,5 +120,52 @@ describe("createRecorder", () => {
     const decoded = (events: TimedEvent[]) => events.filter(({ event }) => DECODED.has(event.type));
     expect(decoded(live)).toHaveLength(12);
     expect(decoded(replayed.events)).toEqual(decoded(live));
+  });
+
+  test("a live recording replays from its session start with the same writes, times and events", async () => {
+    // The recording began 250 ms before this session, as it does for a second scale.
+    const recordingStartT = 9750;
+    const sessionStartT = 10_000;
+    const clock = useFakeClock(sessionStartT);
+    const source = createFakeSource(clock);
+    const recorder = createRecorder({ startT: recordingStartT, label: "b" });
+    const live: TimedEvent[] = [];
+    startRunner({
+      source,
+      session: acaia.createSession(ACAIA_GATT),
+      clock,
+      onEvent(event) {
+        if (event.type === "started") recorder.sessionStarted(event.t);
+        if (event.type === "packet") recorder.add(event.packet);
+        if (event.type === "scale") live.push(relativeTo(recordingStartT, event));
+      },
+    });
+    const traffic: [number, string][] = [
+      [300, RX.weight],
+      [450, RX.settings],
+      [700, RX.buttonStart],
+      [1500, RX.timer],
+      [1800, RX.weight.slice(0, 16)],
+      [1810, RX.weight.slice(16)],
+      [2600, RX.ackWithNegativeWeight],
+      [3300, RX.buttonStop],
+    ];
+    for (const [t, hex] of traffic) {
+      await advanceTo(clock, sessionStartT + t);
+      source.notify(ACAIA_SVC, ACAIA_NOTIFY, hexToBytes(hex));
+    }
+    // End the recording on a heartbeat, which replay must still produce.
+    await advanceTo(clock, sessionStartT + SUBSCRIBE_SETTLE_MS + 4 * NEW_STYLE_HEARTBEAT_MS);
+
+    const fixture = parseFixture(recorder.export(DETAILS).jsonl);
+    const replayed = replay(acaia.createSession(ACAIA_GATT), fixture);
+
+    const recordedWrites = fixture.records.filter((r) => r.dir === "tx");
+    expect(fixture.header.sessionStartT).toBe(sessionStartT - recordingStartT);
+    expect(recordedWrites.filter(({ hex }) => hex === TX.heartbeat)).toHaveLength(4);
+    expect(fixture.records.at(-1)?.hex).toBe(TX.notificationRequest);
+    expect(replayedWrites(replayed)).toEqual(recordedWrites);
+    expect(replayed.events.filter(({ event }) => DECODED.has(event.type))).toHaveLength(12);
+    expect(replayed.events).toEqual(live);
   });
 });

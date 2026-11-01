@@ -30,8 +30,9 @@ export function bytesToHex(bytes: Uint8Array): string {
 
 /**
  * Plays a fixture's "rx" packets into a session at their recorded times, ticking whenever a
- * requested wake-up falls due, exactly as an app's glue would. Wake-ups after the last packet
- * are not run: the recording ended there.
+ * requested wake-up falls due, exactly as an app's glue would. The session starts at the header's
+ * `sessionStartT`, or at the first record when the header has none (ADR 0018). Wake-ups after the
+ * last packet are not run: the recording ended there.
  */
 export function replay(session: ScaleSession, fixture: Fixture): ReplayResult {
   const result: ReplayResult = { events: [], commands: [] };
@@ -57,7 +58,7 @@ export function replay(session: ScaleSession, fixture: Fixture): ReplayResult {
     }
   }
 
-  const startT = fixture.records[0]?.t ?? 0;
+  const startT = fixture.header.sessionStartT ?? fixture.records[0]?.t ?? 0;
   apply(session.start(startT), startT);
   for (const record of fixture.records) {
     tickUntil(record.t);

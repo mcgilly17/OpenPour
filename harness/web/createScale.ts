@@ -47,7 +47,8 @@ export function createScale(options: ScaleOptions): Scale {
       session,
       clock,
       onEvent(event) {
-        if (event.type === "packet") recorder.add(event.packet);
+        if (event.type === "started") recorder.sessionStarted(event.t);
+        else if (event.type === "packet") recorder.add(event.packet);
         else showRunnerEvent(panel, event);
       },
     });

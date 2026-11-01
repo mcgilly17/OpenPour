@@ -165,6 +165,16 @@ apply(session.start(now()));
 `t` should be the arrival time, stamped as close to the radio as the BLE
 library allows. The app also owns permissions, reconnects and BLE timeouts.
 
+### Replay
+
+`openpour/replay` is the same glue running on recorded time:
+`replay(session, parseFixture(text))` starts the session at the header's
+`sessionStartT`, or at the first record when the header has none (ADR 0018).
+It then feeds each `rx` line to `receive` at its `t`, and ticks at every due
+`wakeAt` up to the last record. Every event and command comes back with its
+time, so a recording made with `sessionStartT` replays with the same writes, at
+the same times, as its `tx` lines.
+
 ### Design rules
 
 - **Flow is computed by OpenPour,** not read from the scale. The default is a 500 ms least-squares slope with a ±0.05 g deadband, both adjustable named constants. One calculation keeps curves comparable across brands.

@@ -12,6 +12,8 @@ export interface Packet {
 }
 
 export type RunnerEvent =
+  /** The time the runner called `session.start`, reported before anything else. */
+  | { type: "started"; t: number }
   | { type: "scale"; t: number; event: ScaleEvent }
   | { type: "packet"; packet: Packet }
   | { type: "commandFailed"; t: number; command: Command; error: unknown }
@@ -127,7 +129,9 @@ export function startRunner({ source, session, clock, onEvent }: RunnerOptions):
   }
 
   source.onDisconnect(close);
-  call((t) => session.start(t));
+  const startT = clock.now();
+  onEvent({ type: "started", t: startT });
+  call((t) => session.start(t), startT);
 
   return {
     tare: () => call((t) => session.tare(t)),

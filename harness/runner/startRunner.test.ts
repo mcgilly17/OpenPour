@@ -172,6 +172,7 @@ describe("startRunner input and output", () => {
     source.notify(SVC, NOTIFY, Uint8Array.of(1));
 
     expect(events).toEqual([
+      { type: "started", t: 0 },
       { type: "scale", t: 0, event: handshaking },
       { type: "sessionThrew", t: 100, error: FAILURE },
       {

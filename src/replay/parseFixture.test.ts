@@ -81,3 +81,27 @@ describe("parseFixture", () => {
     expect(protocolError(() => parseFixture(text))).toContain("MAC-shaped");
   });
 });
+
+describe("parseFixture session start", () => {
+  const FIRST = { t: 104, dir: "rx", svc: "s", chr: "n", hex: "00" };
+
+  test.each([0, 3.25, 104])("accepts %s, no later than the first record", (sessionStartT) => {
+    const fixture = parseFixture(jsonl({ ...HEADER, sessionStartT }, FIRST));
+    expect(fixture.header.sessionStartT).toBe(sessionStartT);
+  });
+
+  test("is optional", () => {
+    expect(parseFixture(jsonl(HEADER, FIRST)).header).not.toHaveProperty("sessionStartT");
+  });
+
+  test.each([
+    ["a string", jsonl({ ...HEADER, sessionStartT: "0" }), "must be a finite number"],
+    ["null", jsonl({ ...HEADER, sessionStartT: null }), "must be a finite number"],
+    ["1e999", jsonl(HEADER).replace(/}$/, ',"sessionStartT":1e999}'), "must be a finite number"],
+    ["after the first record", jsonl({ ...HEADER, sessionStartT: 104.001 }, FIRST), "is after"],
+  ])("rejects %s", (_, text, reason) => {
+    expect(protocolError(() => parseFixture(text))).toContain(
+      `line 1: header "sessionStartT" ${reason}`,
+    );
+  });
+});

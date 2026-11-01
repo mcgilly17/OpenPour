@@ -1,12 +1,16 @@
 import { acaia, SUBSCRIBE_SETTLE_MS } from "openpour/acaia";
+import { parseFixture } from "openpour/replay";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
 import { ACAIA_GATT } from "../test/acaiaGatt.js";
 import { advanceTo, useFakeClock } from "../test/useFakeClock.js";
 import { createScale } from "./createScale.js";
 import type { ScalePanel } from "./createScalePanel.js";
+import { downloadText } from "./downloadText.js";
 import { BATTERY_ONLY_GATT } from "./test/batteryOnlyGatt.js";
 import { asDevice, operationsOn, type StubGatt, stubGatt } from "./test/stubGatt.js";
+
+vi.mock("./downloadText.js");
 
 const DISCOVERY = ["connect", "getPrimaryServices", "getCharacteristics"];
 
@@ -59,5 +63,18 @@ describe("createScale", () => {
     expect(operationsOn(gatt)).toEqual([...DISCOVERY, "startNotifications", ...writes]);
     expect(panel.setConnection.mock.calls).toEqual([["connecting"], ["connected"]]);
     expect(panel.show).toHaveBeenCalledWith("protocol", "handshaking");
+  });
+
+  test("an exported fixture records when the session started, before its first write", async () => {
+    const { clock, panel, connected } = connectTo(stubGatt(ACAIA_GATT));
+    await connected;
+    await advanceTo(clock, SUBSCRIBE_SETTLE_MS);
+
+    panel.onExport.mock.calls[0]?.[0](new FormData());
+
+    const jsonl = vi.mocked(downloadText).mock.calls[0]?.[1] ?? "";
+    const fixture = parseFixture(jsonl);
+    expect(fixture.header.sessionStartT).toBe(0);
+    expect(fixture.records[0]?.t).toBe(SUBSCRIBE_SETTLE_MS);
   });
 });

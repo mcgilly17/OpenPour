@@ -5,7 +5,7 @@ import type { Packet } from "./startRunner.js";
 export const FIXTURE_TIME_DECIMALS = 3;
 
 /** The header fields a recording can't know by itself. */
-export type FixtureDetails = Omit<FixtureHeader, "v" | "scrubbed">;
+export type FixtureDetails = Omit<FixtureHeader, "v" | "scrubbed" | "sessionStartT">;
 
 export interface RecorderOptions {
   /** Shared by every scale in one recording, so their times line up. */
@@ -21,6 +21,8 @@ export interface ExportedFixture {
 }
 
 export interface Recorder {
+  /** Pass the runner's `started` time for this scale; it becomes the header's `sessionStartT`. */
+  sessionStarted(t: number): void;
   /** Pass every runner `packet` event for this scale. */
   add(packet: Packet): void;
   /** This scale's ADR 0013 fixture, checked with `parseFixture`; the label joins the scenario. */
@@ -38,7 +40,11 @@ function fileNamePart(value: string): string {
  * `scrubbed` is true because a recording holds only the session's own traffic: no addresses,
  * device IDs or other devices. There is no per-driver payload masking yet.
  */
-function headerOf(details: FixtureDetails, label: string): FixtureHeader {
+function headerOf(
+  details: FixtureDetails,
+  label: string,
+  sessionStartT: number | undefined,
+): FixtureHeader {
   const { brand, model, modelYear, firmware, captured, tool, scenario } = details;
   return {
     v: 1,
@@ -50,19 +56,24 @@ function headerOf(details: FixtureDetails, label: string): FixtureHeader {
     tool,
     scenario: `${scenario}-${label}`,
     scrubbed: true,
+    ...(sessionStartT === undefined ? {} : { sessionStartT }),
   };
 }
 
-/** Records one scale's packets for export as a fixture. */
+/** Records one scale's session start and packets for export as a fixture. */
 export function createRecorder({ startT, label }: RecorderOptions): Recorder {
   const records: FixtureRecord[] = [];
+  let sessionStartT: number | undefined;
+  const relative = (t: number): number => Number((t - startT).toFixed(FIXTURE_TIME_DECIMALS));
   return {
+    sessionStarted(t) {
+      sessionStartT = relative(t);
+    },
     add({ t, dir, svc, chr, bytes }) {
-      const relativeT = Number((t - startT).toFixed(FIXTURE_TIME_DECIMALS));
-      records.push({ t: relativeT, dir, svc, chr, hex: bytesToHex(bytes) });
+      records.push({ t: relative(t), dir, svc, chr, hex: bytesToHex(bytes) });
     },
     export(details) {
-      const header = headerOf(details, label);
+      const header = headerOf(details, label, sessionStartT);
       const jsonl = `${[header, ...records].map((line) => JSON.stringify(line)).join("\n")}\n`;
       parseFixture(jsonl);
       const name = [header.model, `fw${header.firmware}`, header.scenario].map(fileNamePart);
