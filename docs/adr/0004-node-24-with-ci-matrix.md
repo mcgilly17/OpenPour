@@ -11,7 +11,7 @@ own Node versions.
 ## Decision
 
 `.node-version` pins Node 24 for development and the main CI job. The test job
-also runs on Node 22, 24 and 26. The package declares `engines.node >= 22`, the oldest version CI tests (Node 20 reached end of life in April 2026).
+also runs on Node 22, 24 and 26, each the latest release of its line. The package declares `engines.node >= 22.18`, the oldest Node 22 that strips TypeScript types by default, which `pnpm harness` relies on to run its launcher (Node 20 reached end of life in April 2026).
 
 ## Consequences
 

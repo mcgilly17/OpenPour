@@ -9,7 +9,7 @@
     "dist"
   ],
   "engines": {
-    "node": ">=22"
+    "node": ">=22.18"
   },
   "packageManager": "pnpm@12.9.0",
   "exports": {
