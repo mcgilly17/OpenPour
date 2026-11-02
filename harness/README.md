@@ -66,15 +66,17 @@ never recorded.
 
 Each connection gets its own recording, and the panel keeps every one in its
 **Recordings** list until you **Discard** it, so a reconnect never loses one.
-Fill in model, model year and firmware (leave `unknown` when you don't know)
-and a scenario, then **Export** the recording you want; a live recording
-exports everything so far. Reloading the page drops every recording, so export
-before stopping `pnpm harness` or changing `src/`.
+Fill in model, model year and firmware (leave `unknown` when you don't know),
+choose a scenario (a check ID from `docs/checks.md` or an investigation such as
+`settings-change`) and add a detail if it helps, such as `sound-off`. Then
+**Export** the recording you want; a live recording exports everything so far.
+Reloading the page drops every recording, so export before stopping
+`pnpm harness` or changing `src/`.
 
 Fixtures are public, so they never contain the browser's device ID. The end of
 a scale's advertised name can come from its hardware address, so the panel
 shows only the brand and the matched prefix, such as "Acaia PEARL". Export
-refuses a model, firmware or scenario with 6 or more hex digits in a row, which
+refuses a model, firmware or scenario detail with 6 or more hex digits in a row, which
 looks like such an identifier.
 
 ## Log
@@ -135,7 +137,8 @@ compare the frames:
    notifications they arrived in. It highlights the bytes that differ, lists
    their indices and values, and draws a bar where each notification began.
    Note the index and both values with the setting you changed, and export
-   both recordings as the evidence.
+   both recordings as the evidence: scenario `settings-change`, with the
+   setting and its value as the detail.
 
 The harness knows nothing about any brand's bytes. A byte's meaning comes from
 your one change and from the driver's decoded events in the log. Matches start
