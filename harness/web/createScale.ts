@@ -20,10 +20,18 @@ import {
 import { createWebBluetoothSource } from "./createWebBluetoothSource.js";
 import { downloadText } from "./downloadText.js";
 import { describeError, explainConnectFailure } from "./explainFailure.js";
-import { findEarlierRuns } from "./findEarlierRuns.js";
+import { findEarlierRuns, findRuns, patternOf } from "./findEarlierRuns.js";
 import { fixtureDetails } from "./fixtureDetails.js";
 import { type OpenedSession, openSession } from "./openSession.js";
 import { retryWhileOutOfRange } from "./retryWhileOutOfRange.js";
+import {
+  EMPTY_SWEEP,
+  NO_MATCHING_FRAME,
+  type Sweep,
+  type SweepAction,
+  sweepDetail,
+  sweepFile,
+} from "./settingsSweep.js";
 import { showDeviceInfo } from "./showDeviceInfo.js";
 import { describeCapabilities, describeInfo, showRunnerEvent } from "./showRunnerEvent.js";
 
@@ -90,6 +98,7 @@ export function publicName(driver: Driver, name: string | undefined): string {
 export function createScale(options: ScaleOptions): Scale {
   const { device, label, driver, clock, recordingStartT, panel } = options;
   const recordings = createRecordings({ label, recordingStartT });
+  let sweep: Sweep = EMPTY_SWEEP;
   let connection: Connection | undefined;
   let attempt: Attempt | undefined;
 
@@ -306,6 +315,16 @@ export function createScale(options: ScaleOptions): Scale {
     if (runner && availability()[command] === undefined) SEND[command](runner);
   }
 
+  /** Downloads `recording`'s fixture and returns its file name; throws when an answer is refused. */
+  function exportRecording(recording: Recording, answers: FormData): string {
+    const details = fixtureDetails(answers, recording.brand);
+    const { fileName, jsonl } = recording.recorder.export(details);
+    downloadText(fileName, jsonl);
+    recording.exportedAs = fileName;
+    showRecordings();
+    return fileName;
+  }
+
   function exportFixture(answers: FormData): void {
     const recording = recordings.find(Number(answers.get("recording")));
     if (!recording) {
@@ -313,13 +332,60 @@ export function createScale(options: ScaleOptions): Scale {
       return;
     }
     try {
-      const details = fixtureDetails(answers, recording.brand);
-      const { fileName, jsonl } = recording.recorder.export(details);
-      downloadText(fileName, jsonl);
-      recording.exportedAs = fileName;
-      showRecordings();
+      exportRecording(recording, answers);
     } catch (error) {
       panel.addError(`Export failed: ${describeError(error)}`);
+    }
+  }
+
+  /** Replaces part of the sweep and shows it; a change without a problem clears the last one. */
+  function showSweep(change: Partial<Sweep>): void {
+    sweep = { ...sweep, problem: undefined, ...change };
+    panel.showSweep(sweep);
+  }
+
+  /** Adds the latest recording's newest tracked frame, exporting that recording as the evidence. */
+  function capture(setting: string, value: string, answers: FormData): void {
+    const recording = recordings.all().at(-1);
+    const searched = recording && [{ id: recording.id, records: recording.recorder.records() }];
+    const run = searched && sweep.tracked && findRuns(searched, sweep.tracked)[0];
+    if (!recording || !run) {
+      showSweep({ problem: NO_MATCHING_FRAME });
+      return;
+    }
+    answers.set("scenarioDetail", sweepDetail(setting, value));
+    try {
+      const fixtureFile = exportRecording(recording, answers);
+      showSweep({ rows: [...sweep.rows, { setting, value, run, fixtureFile }] });
+    } catch (error) {
+      showSweep({ problem: `Not captured: ${describeError(error)}` });
+    }
+  }
+
+  function exportSweep(answers: FormData): void {
+    try {
+      const details = fixtureDetails(answers, publicName(driver, device.name));
+      const { fileName, json } = sweepFile(sweep, details, new Date().toISOString());
+      downloadText(fileName, json);
+      showSweep({});
+    } catch (error) {
+      showSweep({ problem: `Export failed: ${describeError(error)}` });
+    }
+  }
+
+  function changeSweep(action: SweepAction): void {
+    switch (action.type) {
+      case "track":
+        showSweep({ tracked: patternOf(action.run, action.prefixBytes) });
+        break;
+      case "capture":
+        capture(action.setting.trim(), action.value.trim(), action.answers);
+        break;
+      case "remove":
+        showSweep({ rows: sweep.rows.toSpliced(action.index, 1) });
+        break;
+      case "export":
+        exportSweep(action.answers);
     }
   }
 
@@ -345,5 +411,6 @@ export function createScale(options: ScaleOptions): Scale {
       .map(({ id, recorder }) => ({ id, records: recorder.records() }));
     return findEarlierRuns(searched, run, prefixBytes);
   });
+  panel.onSweep(changeSweep);
   return { connect };
 }

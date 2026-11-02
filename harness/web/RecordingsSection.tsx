@@ -1,5 +1,5 @@
 import { DownloadIcon, Trash2Icon } from "lucide-react";
-import { type FormEvent, type JSX, useId } from "react";
+import { type FormEvent, type JSX, type Ref, useId } from "react";
 import { Button } from "./components/ui/button.js";
 import { Input } from "./components/ui/input.js";
 import { Table, TableBody, TableCell, TableRow } from "./components/ui/table.js";
@@ -77,6 +77,8 @@ export interface RecordingsSectionProps extends RecordingRowsProps {
   onExport(answers: FormData): void;
   /** Where model, model year and firmware start: the saved scale's, still editable. */
   defaults?: ScaleDetails | undefined;
+  /** The export form, whose current answers the settings sweep exports with. */
+  formRef?: Ref<HTMLFormElement>;
 }
 
 /** The kept recordings and the form every export uses: each Export button submits it. */
@@ -85,6 +87,7 @@ export function RecordingsSection({
   onExport,
   onDiscard,
   defaults,
+  formRef,
 }: RecordingsSectionProps): JSX.Element {
   function submit(event: FormEvent<HTMLFormElement>): void {
     event.preventDefault();
@@ -97,7 +100,7 @@ export function RecordingsSection({
       title="Recordings"
       hint="Every connection's recording stays here until you discard it. Fill these in, then export any recording."
     >
-      <form onSubmit={submit} className="grid gap-3">
+      <form ref={formRef} onSubmit={submit} className="grid gap-3">
         {/* The form's default button: disabled, so Enter in a field exports nothing. */}
         <button type="submit" disabled hidden />
         <ExportFields defaults={defaults} />

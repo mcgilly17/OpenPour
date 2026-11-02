@@ -1,5 +1,5 @@
 import { BookmarkIcon, TriangleAlertIcon } from "lucide-react";
-import { type JSX, useCallback, useState, useSyncExternalStore } from "react";
+import { type JSX, useCallback, useRef, useState, useSyncExternalStore } from "react";
 import { CommandBar } from "./CommandBar.js";
 import { ComparePanel } from "./ComparePanel.js";
 import type { PacketRun } from "./comparePackets.js";
@@ -14,7 +14,9 @@ import { Readouts } from "./Readouts.js";
 import { RecordingsSection } from "./RecordingsSection.js";
 import { SavedScaleForm } from "./SavedScaleForm.js";
 import { ScaleHeader } from "./ScaleHeader.js";
+import { SweepSection } from "./SweepSection.js";
 import type { SavedScale, SavedScaleDetails } from "./savedScales.js";
+import { sweepAnswers } from "./settingsSweep.js";
 
 function ListenWarning(): JSX.Element {
   return (
@@ -38,10 +40,9 @@ export interface ScaleCardProps {
 
 /** One scale's card, rendered from its panel store. */
 export function ScaleCard({ panel, saved, onSave }: ScaleCardProps): JSX.Element {
-  const { fields, connection, controls, commands, recordings, log, errors } = useSyncExternalStore(
-    panel.subscribe,
-    panel.getSnapshot,
-  );
+  const { fields, connection, controls, commands, recordings, log, errors, sweep } =
+    useSyncExternalStore(panel.subscribe, panel.getSnapshot);
+  const exportForm = useRef<HTMLFormElement>(null);
   const [marks, setMarks] = useState<Marks>({});
   const [isSaving, setSaving] = useState(false);
   const mark = useCallback(
@@ -76,9 +77,17 @@ export function ScaleCard({ panel, saved, onSave }: ScaleCardProps): JSX.Element
           defaults={saved}
           onExport={panel.exportFixture}
           onDiscard={panel.discard}
+          formRef={exportForm}
         />
         <LogTable rows={log} marks={marks} onMark={mark} />
         <ComparePanel marks={marks} onMark={mark} findEarlier={panel.findEarlier} />
+        <SweepSection
+          sweep={sweep}
+          markA={marks.A}
+          answers={() => sweepAnswers(new FormData(exportForm.current ?? undefined), saved)}
+          onSweep={panel.changeSweep}
+          onMark={mark}
+        />
       </CardContent>
     </Card>
   );

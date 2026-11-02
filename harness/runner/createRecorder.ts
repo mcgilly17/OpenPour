@@ -33,7 +33,8 @@ export interface Recorder {
 
 const UNSAFE_FILE_NAME_CHARS = /[^A-Za-z0-9.-]+/g;
 
-function fileNamePart(value: string): string {
+/** `value` with every run of characters unsafe in a file name replaced by "-". */
+export function fileNamePart(value: string): string {
   return value.replace(UNSAFE_FILE_NAME_CHARS, "-");
 }
 
