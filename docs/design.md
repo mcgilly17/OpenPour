@@ -225,7 +225,8 @@ Verified facts move into `spec/acaia.md`, each tied to the fixture that proves i
 
 ### Observed on hardware (smoke tests, not yet fixture-backed)
 
-First live-harness sessions on a Pearl S (2022, firmware 1.0.009 A) and a
+First live-harness sessions on a Pearl S (2022, firmware 1.0.008, updated to
+1.0.009 A afterwards) and a
 Lunar (2021 per its owner, firmware 1.0.019 A). These are observations, not verified facts: each moves to
 `spec/acaia.md` only with a committed fixture (1.1, 1.5b).
 
@@ -243,9 +244,12 @@ Lunar (2021 per its owner, firmware 1.0.019 A). These are observations, not veri
   "Lunar 2021+ is new style" note above; it decoded on the first attempt.
   Whether "2021" is the model generation or the purchase year is unconfirmed. It splits every frame after `EF DD 0C`; the Pearl S splits at
   arbitrary points.
-- **A type 7 ("not identified") frame** arrived immediately after subscribing
-  on one Pearl S reconnect, before the planned identify; on another connection
-  it did not.
+- **The type 7 frame is an info frame carrying the scale's firmware.** One
+  arrived immediately after subscribing on a Pearl S reconnect (on another
+  connection none did): length `07`, payload `03 5C 01 00 08 01`. Payload bytes
+  2–4 read 1.0.8, the firmware the scale was running, later confirmed by its
+  owner. Bytes 0–1 differ between models and are unknown, possibly a model
+  code. The session currently treats the frame only as "send identify again".
 - **Battery** arrives unrequested about every 20 s on the Pearl S. A Lunar
   decoded as 81%; not yet compared with the vendor app.
 - **Timer record on the old Lunar:** every weight frame carries `07 00 00 02`,
