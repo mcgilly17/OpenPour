@@ -67,7 +67,8 @@ never recorded.
 
 Each connection gets its own recording, and the scale's card keeps every one in its
 **Recordings** list until you **Discard** it, so a reconnect never loses one.
-Fill in model, model year and firmware (leave `unknown` when you don't know),
+Fill in model, model year and firmware (leave `unknown` when you don't know;
+a [saved scale](#saved-scales) fills them in),
 choose a **Scenario** (a check ID from `docs/checks.md` or an investigation such as
 `settings-change`) and add a **Detail** if it helps, such as `sound-off`. Then
 **Export** the recording you want; a live recording exports everything so far.
@@ -81,6 +82,37 @@ a scale's advertised name can come from its hardware address, so the card
 shows only the brand and the matched prefix, such as "Acaia PEARL". Export
 refuses a model, firmware or scenario detail with 6 or more hex digits in a row, which
 looks like such an identifier.
+
+## Saved scales
+
+**Save scale** on a scale's card keeps a nickname, model, model year and
+firmware for it in the browser's `localStorage`, keyed by the ID the browser
+gave the device. When that scale connects again, its card shows the nickname
+and the export form starts from the saved details: change them there for one
+export, or **Edit saved scale** to keep the change. Saved details pass the same
+identifier check as an export. The device ID and the nickname stay in the
+browser's storage, never in a fixture, an export, the log or a file. A page
+without storage, such as one with site data blocked, works as before and
+says so when you save.
+
+**Saved scales**, above the cards, lists them:
+
+- **Connect** (or **Connect listen-only**) finds the scale among the devices
+  the browser remembers for this page (`navigator.bluetooth.getDevices()`),
+  with no chooser. Until a scan has seen a device the browser may be unable to
+  reach it, so the page first watches for the scale's advertisement, for up
+  to 10 s (`ADVERTISEMENT_WAIT_MS`), then connects exactly as a chosen scale
+  does: the same name prefixes, GATT layout check, Device Information reads
+  and retries while it isn't advertising. The card's notes say how long the
+  advertisement took, or that none came.
+- **Edit** changes the saved details.
+- **Remove** deletes them and asks the browser to forget the scale
+  (`device.forget()`). That drops its connection, and connecting it again
+  needs the chooser.
+
+Storage and the browser's Bluetooth permissions both belong to the origin,
+and the port is part of it: another `--port`, or the next free port when 5173
+was taken, sees a different saved list and no remembered scales.
 
 ## Log
 
@@ -175,6 +207,9 @@ Tailwind plugins; there is no Vite config file.
   `RecordingsSection`, `LogTable`, `ComparePanel`) is its own component; a new
   part, such as a GATT browser, a check list or a weight plot, is another
   section in `ScaleCard`.
+- `savedScales` reads and writes saved scales over any Storage-like object;
+  `rememberedDevice` and `waitForAdvertisement` find and wake a saved scale
+  for `useScales` to connect like a chosen one.
 - Logic lives in plain modules with their own tests. Component tests
   (`*.test.tsx`, jsdom) cover what a view decides itself, such as the scenario
   dropdown feeding the export.
@@ -194,4 +229,7 @@ Tailwind plugins; there is no Vite config file.
 | … timed out after 3000 ms              | A Bluetooth operation stalled. The page moves on to the next command; if errors keep coming, disconnect and reconnect.                                                            |
 | disconnected soon after listen-only    | Expected: nothing is sent, not even heartbeats. Press **Start session** sooner, or reconnect listen-only; the recording so far is kept.                                           |
 | disconnected, without a click          | The scale dropped the connection, slept, or `src/` was rebuilt and the page reloaded.                                                                                             |
-| looks like a device identifier         | An export answer has 6 or more hex digits in a row, such as a serial number, an address or a compact date. Reword it; write a date with dashes.                                   |
+| looks like a device identifier         | An export answer or saved detail has 6 or more hex digits in a row, such as a serial number, an address or a compact date. Reword it; write a date with dashes.                   |
+| doesn't list the scales it remembers   | Chrome has no `getDevices()` here: try `chrome://flags/#enable-web-bluetooth-new-permissions-backend`, restart, then choose the scale once more.                                  |
+| no longer remembers this scale         | Its permission went: removed, forgotten or lost on a restart. Choose it again. If its card lacks the nickname it got a new ID: save it again, remove the old row.                 |
+| No advertisement from the saved scale  | It stayed silent for 10 s: asleep, off, or connected to another app or tab. The page connected anyway; wake it and press **Reconnect**.                                           |
