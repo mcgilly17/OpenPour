@@ -225,8 +225,8 @@ Verified facts move into `spec/acaia.md`, each tied to the fixture that proves i
 
 ### Observed on hardware (smoke tests, not yet fixture-backed)
 
-First live-harness sessions on a Pearl S (2022, firmware 1.0.009 A) and an
-older Lunar. These are observations, not verified facts: each moves to
+First live-harness sessions on a Pearl S (2022, firmware 1.0.009 A) and a
+Lunar (2021 per its owner, firmware 1.0.019 A). These are observations, not verified facts: each moves to
 `spec/acaia.md` only with a committed fixture (1.1, 1.5b).
 
 - **The "new style" service is a module default:** `49535343-…` is the
@@ -239,8 +239,9 @@ older Lunar. These are observations, not verified facts: each moves to
 - **Device Information (0x180A) describes the module,** not the scale: the
   Pearl S reports `MCHP`, `BM70`, firmware `009010`. The scale's own model and
   firmware are not known to be readable yet.
-- **The Lunar tested is old style** (`1820`/`2a80`) and decoded on the first
-  attempt. It splits every frame after `EF DD 0C`; the Pearl S splits at
+- **The 2021 Lunar tested is old style** (`1820`/`2a80`), contradicting the
+  "Lunar 2021+ is new style" note above; it decoded on the first attempt.
+  Whether "2021" is the model generation or the purchase year is unconfirmed. It splits every frame after `EF DD 0C`; the Pearl S splits at
   arbitrary points.
 - **A type 7 ("not identified") frame** arrived immediately after subscribing
   on one Pearl S reconnect, before the planned identify; on another connection
