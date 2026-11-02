@@ -251,10 +251,52 @@ describe("createScale controls", () => {
   });
 });
 
-describe("createScale waiting for a scale to advertise", () => {
-  const outOfRange = () =>
-    new DOMException("Bluetooth Device is no longer in range.", "NetworkError");
+const outOfRange = () =>
+  new DOMException("Bluetooth Device is no longer in range.", "NetworkError");
 
+describe("createScale runs one connection at a time", () => {
+  test("Reconnect and listen-only while connected start no second session or runner", async () => {
+    const gatt = stubGatt(ACAIA_GATT);
+    const driver = { ...acaia, createSession: vi.fn(acaia.createSession) };
+    const { clock, panel, recordingStartT, connected } = connectTo(gatt, { driver });
+    await connected;
+    const interval = 10 * NEW_STYLE_HEARTBEAT_MS;
+    await advanceTo(clock, interval);
+    const writesAlone = writtenHex(gatt).length;
+    await advanceTo(clock, 2 * interval);
+    const writesPerInterval = writtenHex(gatt).length - writesAlone;
+    expect(writesPerInterval).toBeGreaterThan(0);
+    const timers = vi.getTimerCount();
+
+    click(panel, "reconnect");
+    click(panel, "listen");
+    await advanceTo(clock, 3 * interval);
+
+    expect(gatt.server.connect).toHaveBeenCalledOnce();
+    expect(driver.createSession).toHaveBeenCalledOnce();
+    expect(recordingStartT).toHaveBeenCalledOnce();
+    expect(writtenHex(gatt).length - writesAlone - writesPerInterval).toBe(writesPerInterval);
+    expect(vi.getTimerCount()).toBe(timers);
+  });
+
+  test("Reconnect while an attempt waits for the scale starts no second attempt", async () => {
+    const gatt = stubGatt(ACAIA_GATT);
+    gatt.server.connect.mockRejectedValueOnce(outOfRange());
+    const driver = { ...acaia, createSession: vi.fn(acaia.createSession) };
+    const { clock, panel, connected } = connectTo(gatt, { driver });
+    await advanceTo(clock, RECONNECT_RETRY_MS / 2);
+    expect(panel.setConnection).toHaveBeenLastCalledWith("waiting");
+
+    click(panel, "reconnect");
+    await advanceTo(clock, RECONNECT_RETRY_MS + SUBSCRIBE_SETTLE_MS);
+    await connected;
+
+    expect(gatt.server.connect).toHaveBeenCalledTimes(2);
+    expect(driver.createSession).toHaveBeenCalledOnce();
+  });
+});
+
+describe("createScale waiting for a scale to advertise", () => {
   test("keeps trying while the scale isn't advertising, then connects", async () => {
     const failures = 3;
     const gatt = stubGatt(ACAIA_GATT);

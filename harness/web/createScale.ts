@@ -48,11 +48,17 @@ interface Connection {
   isClosed: boolean;
 }
 
+/** A connection attempt in flight, which may be waiting for the scale to advertise. */
+interface Attempt {
+  cancel(): void;
+  isWaiting: boolean;
+}
+
 export interface Scale {
   /**
    * Connects with a fresh session and recording. A scale that isn't advertising yet, such as one
    * just switched on, is retried until it does, for up to RECONNECT_WINDOW_MS, or until Cancel.
-   * Failures are shown, never thrown.
+   * Failures are shown, never thrown. Does nothing while a connection is open or being opened.
    */
   connect(mode: ConnectMode): Promise<void>;
 }
@@ -79,7 +85,7 @@ export function createScale(options: ScaleOptions): Scale {
   const { device, label, driver, clock, recordingStartT, panel } = options;
   const recordings = createRecordings({ label, recordingStartT });
   let connection: Connection | undefined;
-  let cancelWaiting: (() => void) | undefined;
+  let attempt: Attempt | undefined;
 
   function showRecordings(): void {
     const summary = (recording: Recording) => ({
@@ -88,6 +94,10 @@ export function createScale(options: ScaleOptions): Scale {
       canDiscard: !recording.isLive,
     });
     panel.showRecordings(recordings.all().map(summary));
+  }
+
+  function isOpen(conn: Connection | undefined): conn is Connection {
+    return conn !== undefined && !conn.isClosed;
   }
 
   function availability() {
@@ -217,8 +227,11 @@ export function createScale(options: ScaleOptions): Scale {
   }
 
   /** Opens a session, waiting for a scale that isn't advertising yet, until `signal` aborts. */
-  async function open(signal: AbortSignal): Promise<OpenedSession> {
-    const onWaiting = () => panel.setConnection("waiting");
+  async function open(signal: AbortSignal, current: Attempt): Promise<OpenedSession> {
+    const onWaiting = () => {
+      current.isWaiting = true;
+      panel.setConnection("waiting");
+    };
     const attempt = () => openSession(device, driver, clock);
     const opened = await retryWhileOutOfRange(attempt, { clock, signal, onWaiting });
     if (signal.aborted) {
@@ -240,13 +253,20 @@ export function createScale(options: ScaleOptions): Scale {
   }
 
   async function connect(mode: ConnectMode): Promise<void> {
+    // A second runner would drive the same scale twice. Closing the open connection instead would
+    // end its live recording unasked, so a connect while one is open or opening does nothing.
+    if (attempt || isOpen(connection)) return;
     const cancelling = new AbortController();
-    cancelWaiting = () => cancelling.abort();
+    const current: Attempt = { cancel: () => cancelling.abort(), isWaiting: false };
+    attempt = current;
     panel.setConnection("connecting");
     panel.show("protocol", EMPTY_FIELD);
     try {
-      begin(await open(cancelling.signal), mode);
+      const opened = await open(cancelling.signal, current);
+      attempt = undefined;
+      begin(opened, mode);
     } catch (error) {
+      attempt = undefined;
       showConnectFailure(error, cancelling.signal.aborted);
     }
   }
@@ -291,7 +311,7 @@ export function createScale(options: ScaleOptions): Scale {
   panel.onAction("reconnect", () => void connect("session"));
   panel.onAction("listen", () => void connect("listen"));
   panel.onAction("startSession", startSession);
-  panel.onAction("cancel", () => cancelWaiting?.());
+  panel.onAction("cancel", () => attempt?.cancel());
   panel.onExport(exportFixture);
   panel.onDiscard(discard);
   panel.onFindEarlier((run, prefixBytes) => {
