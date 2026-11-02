@@ -1,4 +1,4 @@
-import type { JSX } from "react";
+import type { JSX, ReactNode } from "react";
 import { Button } from "./components/ui/button.js";
 import { CardHeader, CardTitle } from "./components/ui/card.js";
 import type {
@@ -24,6 +24,8 @@ export interface ScaleHeaderProps {
   /** Which buttons work, as the scale reports them. */
   controls: ConnectionControls;
   onAction(action: PanelAction): void;
+  /** More buttons after the connection ones. */
+  children?: ReactNode;
 }
 
 /** The scale's name, its status, and the buttons that open or close its connection. */
@@ -33,6 +35,7 @@ export function ScaleHeader({
   protocol,
   controls,
   onAction,
+  children,
 }: ScaleHeaderProps): JSX.Element {
   return (
     <CardHeader className="flex flex-col gap-3 border-b [.border-b]:pb-4">
@@ -52,6 +55,7 @@ export function ScaleHeader({
             {label}
           </Button>
         ))}
+        {children}
       </div>
     </CardHeader>
   );

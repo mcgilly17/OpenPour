@@ -1,9 +1,10 @@
-import { TriangleAlertIcon } from "lucide-react";
+import { BookmarkIcon, TriangleAlertIcon } from "lucide-react";
 import { type JSX, useCallback, useState, useSyncExternalStore } from "react";
 import { CommandBar } from "./CommandBar.js";
 import { ComparePanel } from "./ComparePanel.js";
 import type { PacketRun } from "./comparePackets.js";
 import { Alert, AlertDescription } from "./components/ui/alert.js";
+import { Button } from "./components/ui/button.js";
 import { Card, CardContent } from "./components/ui/card.js";
 import { EMPTY_FIELD, type ScalePanelStore } from "./createScalePanel.js";
 import { LogTable } from "./LogTable.js";
@@ -11,7 +12,9 @@ import type { MarkSlot, Marks } from "./Marks.js";
 import { NotesList } from "./NotesList.js";
 import { Readouts } from "./Readouts.js";
 import { RecordingsSection } from "./RecordingsSection.js";
+import { SavedScaleForm } from "./SavedScaleForm.js";
 import { ScaleHeader } from "./ScaleHeader.js";
+import type { SavedScale, SavedScaleDetails } from "./savedScales.js";
 
 function ListenWarning(): JSX.Element {
   return (
@@ -25,33 +28,52 @@ function ListenWarning(): JSX.Element {
   );
 }
 
+export interface ScaleCardProps {
+  panel: ScalePanelStore;
+  /** This scale's saved details, if it is saved. */
+  saved: SavedScale | undefined;
+  /** Saves this scale's details; returns why they weren't saved, or undefined. */
+  onSave(details: SavedScaleDetails): string | undefined;
+}
+
 /** One scale's card, rendered from its panel store. */
-export function ScaleCard({ panel }: { panel: ScalePanelStore }): JSX.Element {
+export function ScaleCard({ panel, saved, onSave }: ScaleCardProps): JSX.Element {
   const { fields, connection, controls, commands, recordings, log, errors } = useSyncExternalStore(
     panel.subscribe,
     panel.getSnapshot,
   );
   const [marks, setMarks] = useState<Marks>({});
+  const [isSaving, setSaving] = useState(false);
   const mark = useCallback(
     (slot: MarkSlot, run: PacketRun) => setMarks((marked) => ({ ...marked, [slot]: run })),
     [],
   );
+  const title = fields.title ?? "Scale";
   return (
     <Card className="min-w-0 gap-4 py-4">
       <ScaleHeader
-        title={fields.title ?? "Scale"}
+        title={saved ? `${title} · ${saved.nickname}` : title}
         connection={connection}
         protocol={fields.protocol ?? EMPTY_FIELD}
         controls={controls}
         onAction={panel.act}
-      />
+      >
+        <Button variant="outline" size="sm" onClick={() => setSaving(true)}>
+          <BookmarkIcon />
+          {saved ? "Edit saved scale" : "Save scale"}
+        </Button>
+      </ScaleHeader>
       <CardContent className="grid gap-6 px-4">
+        {isSaving && (
+          <SavedScaleForm initial={saved} onSave={onSave} onClose={() => setSaving(false)} />
+        )}
         {connection === "listening" && <ListenWarning />}
         <Readouts fields={fields} />
         <CommandBar availability={commands} onCommand={panel.act} />
         <NotesList lines={errors} />
         <RecordingsSection
           recordings={recordings}
+          defaults={saved}
           onExport={panel.exportFixture}
           onDiscard={panel.discard}
         />

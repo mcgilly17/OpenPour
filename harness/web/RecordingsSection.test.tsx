@@ -4,6 +4,7 @@ import { afterEach, describe, expect, test, vi } from "vitest";
 
 import { scenarioOf } from "./fixtureDetails.js";
 import { RecordingsSection } from "./RecordingsSection.js";
+import type { SavedScale } from "./savedScales.js";
 
 afterEach(() => {
   cleanup();
@@ -15,10 +16,26 @@ const RECORDINGS = [
   { id: 2, text: "#2 session, live", canDiscard: false },
 ];
 
-function renderSection() {
+const SAVED: SavedScale = {
+  id: "Xq7Lm+Pz2wRk/5Ny0Ab==",
+  name: "Acaia LUNAR",
+  nickname: "Kitchen Lunar",
+  model: "AL008",
+  modelYear: "2021",
+  firmware: "1.0.016",
+};
+
+function renderSection(defaults?: SavedScale) {
   const onExport = vi.fn<(answers: FormData) => void>();
   const onDiscard = vi.fn<(recording: number) => void>();
-  render(<RecordingsSection recordings={RECORDINGS} onExport={onExport} onDiscard={onDiscard} />);
+  render(
+    <RecordingsSection
+      recordings={RECORDINGS}
+      onExport={onExport}
+      onDiscard={onDiscard}
+      defaults={defaults}
+    />,
+  );
   const buttons = (name: string) => screen.getAllByRole("button", { name });
   return { onExport, onDiscard, buttons };
 }
@@ -42,6 +59,24 @@ describe("RecordingsSection", () => {
     expect(answers && scenarioOf(answers)).toBe("settings-change-sound-off");
     expect(answers?.get("model")).toBe("unknown");
     expect(screen.getByRole("combobox", { name: "Scenario" }).textContent).toBe("settings-change");
+  });
+
+  test("starts from the saved scale's details, still editable, and exports only the form's answers", () => {
+    const { onExport, buttons } = renderSection(SAVED);
+
+    chooseScenario("smoke");
+    fireEvent.change(screen.getByLabelText("Firmware"), { target: { value: "1.1.0" } });
+    fireEvent.click(buttons("Export")[0] as HTMLElement);
+
+    const answers = onExport.mock.calls[0]?.[0];
+    expect(Object.fromEntries(answers?.entries() ?? [])).toEqual({
+      model: "AL008",
+      modelYear: "2021",
+      firmware: "1.1.0",
+      scenario: "smoke",
+      scenarioDetail: "",
+      recording: "1",
+    });
   });
 
   test("offers every check ID and the investigations", () => {

@@ -16,6 +16,11 @@ export function buildRequestOptions(driver: Driver): RequestDeviceOptions {
   };
 }
 
+/** The driver's name prefix that `name` starts with, as the chooser's filters match names. */
+export function matchedPrefix(driver: Driver, name: string | undefined): string | undefined {
+  return driver.namePrefixes.find((namePrefix) => name?.startsWith(namePrefix));
+}
+
 /**
  * Opens the browser's device chooser for `driver`. Browsers allow this only during a user
  * gesture, and the page calls it only from the Connect button's click handler: it never scans or

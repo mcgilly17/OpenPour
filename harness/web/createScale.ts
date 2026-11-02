@@ -3,6 +3,7 @@ import type { Clock } from "../runner/Clock.js";
 import { createListeningSource, type ListeningSource } from "../runner/createListeningSource.js";
 import { type Packet, type Runner, type RunnerEvent, startRunner } from "../runner/startRunner.js";
 import { type Characteristic, subscriptionsOnStart } from "../runner/subscriptionsOnStart.js";
+import { matchedPrefix } from "./chooseScale.js";
 import { commandAvailability, KNOWN_COMMANDS, type KnownCommand } from "./commandAvailability.js";
 import {
   createRecordings,
@@ -80,8 +81,8 @@ const SEND: Record<KnownCommand, (runner: Runner) => void> = {
  * The brand and the name prefix the device matched, e.g. "Acaia PEARL". The rest of an advertised
  * name can be derived from the scale's address, so it is never shown where it could be copied.
  */
-function publicName(driver: Driver, name: string | undefined): string {
-  const prefix = driver.namePrefixes.find((namePrefix) => name?.startsWith(namePrefix));
+export function publicName(driver: Driver, name: string | undefined): string {
+  const prefix = matchedPrefix(driver, name);
   return prefix === undefined ? driver.brand : `${driver.brand} ${prefix}`;
 }
 
