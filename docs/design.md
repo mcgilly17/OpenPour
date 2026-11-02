@@ -223,6 +223,36 @@ Verified facts move into `spec/acaia.md`, each tied to the fixture that proves i
 - **Lunar 2021:** tare and timer need current firmware. Only 2021+ models report the timer state.
 - **Lunar model year:** check whether a given Lunar is a 2021 or 2025 model; the protocols may differ.
 
+### Observed on hardware (smoke tests, not yet fixture-backed)
+
+First live-harness sessions on a Pearl S (2022, firmware 1.0.009 A) and an
+older Lunar. These are observations, not verified facts: each moves to
+`spec/acaia.md` only with a committed fixture (1.1, 1.5b).
+
+- **The "new style" service is a module default:** `49535343-…` is the
+  Microchip (ISSC) transparent-UART service of the BM70 radio module; Acaia's
+  protocol runs over it. The Pearl S also exposes `49535343-c9d0-cc83-a44a-6fe238d06d33`,
+  likely the module's own configuration or update channel, which OpenPour must
+  never write to. GATT layout therefore identifies the chip, not the brand: for
+  new-style Acaia, the name filter does more of the device matching than the
+  GATT fingerprint.
+- **Device Information (0x180A) describes the module,** not the scale: the
+  Pearl S reports `MCHP`, `BM70`, firmware `009010`. The scale's own model and
+  firmware are not known to be readable yet.
+- **The Lunar tested is old style** (`1820`/`2a80`) and decoded on the first
+  attempt. It splits every frame after `EF DD 0C`; the Pearl S splits at
+  arbitrary points.
+- **A type 7 ("not identified") frame** arrived immediately after subscribing
+  on one Pearl S reconnect, before the planned identify; on another connection
+  it did not.
+- **Battery** arrives unrequested about every 20 s on the Pearl S. A Lunar
+  decoded as 81%; not yet compared with the vendor app.
+- **Timer record on the old Lunar:** every weight frame carries `07 00 00 02`,
+  which decodes as "stopped at 0.2 s" and never changes while the timer is
+  idle. Unverified until the timer is run (check C9).
+- **Connections:** a scale drops a connection that sends no heartbeat within a
+  few seconds, and needs a few seconds after power-on before it accepts one.
+
 ## Protocol spec (later, once there are users)
 
 This is a Bluetooth service that scale makers can build into their firmware.
