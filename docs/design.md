@@ -257,8 +257,9 @@ Lunar (2021 per its owner, firmware 1.0.019 A). These are observations, not veri
 - **Lunar settings frame** (`EF DD 08`, length `09`): `4E 02 01 01 00 01 01`.
   Against the vendor app: auto-off code `01` matched "5 minutes" and sound `01`
   matched "on". The app also showed touch on, auto connect on and max weight
-  1000 g, which the remaining bytes (`01`, `00`, `01`) don't yet explain;
-  change-one-setting captures will.
+  1000 g. Changing only max weight from 2000 g to 1000 g flipped only the last
+  byte, `01` to `00` (other sources call it resolution). Touch, auto connect and
+  the remaining bytes (`01`, `00`) are not yet placed.
 - **Timer record on the old Lunar:** every weight frame carries `07 00 00 02`,
   which decodes as "stopped at 0.2 s" and never changes while the timer is
   idle. Unverified until the timer is run (check C9).
