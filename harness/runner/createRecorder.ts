@@ -23,10 +23,10 @@ export interface ExportedFixture {
 export interface Recorder {
   /** Pass the runner's `started` time for this scale; it becomes the header's `sessionStartT`. */
   sessionStarted(t: number): void;
-  /** Pass every runner `packet` event for this scale. */
-  add(packet: Packet): void;
-  /** Whether any packet was added, i.e. whether there is anything to lose by discarding this. */
-  hasPackets(): boolean;
+  /** Pass every runner `packet` event for this scale; returns the record exactly as it is kept. */
+  add(packet: Packet): FixtureRecord;
+  /** Every record kept so far, in the order added. */
+  records(): readonly FixtureRecord[];
   /** This scale's ADR 0013 fixture, checked with `parseFixture`; the label joins the scenario. */
   export(details: FixtureDetails): ExportedFixture;
 }
@@ -72,9 +72,11 @@ export function createRecorder({ startT, label }: RecorderOptions): Recorder {
       sessionStartT = relative(t);
     },
     add({ t, dir, svc, chr, bytes }) {
-      records.push({ t: relative(t), dir, svc, chr, hex: bytesToHex(bytes) });
+      const record: FixtureRecord = { t: relative(t), dir, svc, chr, hex: bytesToHex(bytes) };
+      records.push(record);
+      return record;
     },
-    hasPackets: () => records.length > 0,
+    records: () => records,
     export(details) {
       const header = headerOf(details, label, sessionStartT);
       // A write arrives once it succeeds, after packets received while it was in flight. The sort

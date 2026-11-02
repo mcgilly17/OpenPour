@@ -2,7 +2,7 @@ import type { Driver } from "openpour";
 import { acaia } from "openpour/acaia";
 import { browserClock } from "./browserClock.js";
 import { chooseScale } from "./chooseScale.js";
-import { createScale } from "./createScale.js";
+import { type ConnectMode, createScale } from "./createScale.js";
 import { createScalePanel } from "./createScalePanel.js";
 import { explainChooseFailure, supportProblem } from "./explainFailure.js";
 import { findElement } from "./findElement.js";
@@ -13,7 +13,10 @@ const clock = browserClock;
 const devices: BluetoothDevice[] = [];
 let recordingStartT: number | undefined;
 
-const connectButton = findElement(document, "#connect", HTMLButtonElement);
+const connectButtons: [HTMLButtonElement, ConnectMode][] = [
+  [findElement(document, "#connect", HTMLButtonElement), "session"],
+  [findElement(document, "#connect-listening", HTMLButtonElement), "listen"],
+];
 const connectProblem = findElement(document, "#connect-problem", HTMLElement);
 const scales = findElement(document, "#scales", HTMLElement);
 
@@ -37,7 +40,7 @@ async function choose(): Promise<BluetoothDevice | undefined> {
   }
 }
 
-async function addScale(): Promise<void> {
+async function addScale(mode: ConnectMode): Promise<void> {
   showProblem(connectProblem, undefined);
   const device = await choose();
   if (!device) return;
@@ -55,11 +58,13 @@ async function addScale(): Promise<void> {
     clock,
     recordingStartT: startRecording,
     panel,
-  }).connect();
+  }).connect(mode);
 }
 
 const problem = supportProblem();
 showProblem(findElement(document, "#support-problem", HTMLElement), problem);
-connectButton.disabled = problem !== undefined;
 // The only path to the device chooser: browsers require a click, and the page never scans by itself.
-connectButton.addEventListener("click", () => void addScale());
+for (const [button, mode] of connectButtons) {
+  button.disabled = problem !== undefined;
+  button.addEventListener("click", () => void addScale(mode));
+}

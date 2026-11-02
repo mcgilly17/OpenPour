@@ -6,34 +6,55 @@
     <title>OpenPour harness</title>
     <link rel="icon" href="data:," />
     <style>
-      body { font: 15px/1.4 system-ui, sans-serif; margin: 1rem; max-width: 60rem; }
+      body { font: 15px/1.4 system-ui, sans-serif; margin: 1rem; max-width: 100rem; }
       .problem { color: #b00020; }
-      #scales { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(22rem, 1fr)); }
-      .scale { border: 1px solid #ccc; border-radius: 6px; padding: 0 1rem 1rem; }
+      .hint { color: #555; font-size: 0.9rem; }
+      #scales { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(36rem, 1fr)); }
+      .scale { border: 1px solid #ccc; border-radius: 6px; padding: 0 1rem 1rem; min-width: 0; }
       dl { display: grid; grid-template-columns: max-content 1fr; gap: 0.25rem 1rem; }
       dt { color: #555; }
       dd { margin: 0; }
       [data-field="weight"] { font-size: 1.5rem; font-variant-numeric: tabular-nums; }
-      form { display: grid; grid-template-columns: max-content 1fr; gap: 0.25rem 0.5rem; margin-top: 1rem; }
-      label { display: contents; }
-      form button { grid-column: span 2; justify-self: start; }
+      form { display: grid; grid-template-columns: max-content 1fr; gap: 0.25rem 0.5rem; }
+      form label { display: contents; }
       ol { padding-left: 1.25rem; }
+      form > ol { grid-column: span 2; }
+      .log, .bytes { overflow: auto; font: 12px/1.35 ui-monospace, monospace; }
+      .log { max-height: 24rem; border: 1px solid #ddd; }
+      .log td { padding: 0 0.4rem; white-space: nowrap; }
+      .log tr.tx { color: #0645ad; }
+      .log tr.event { color: #555; }
+      .log tr.marker { font-style: italic; }
+      .log tr.mark-a { background: #fff1a8; }
+      .log tr.mark-b { background: #c9ecff; }
+      .log button { font: inherit; padding: 0 0.3rem; }
+      .bytes td, .bytes th { padding: 0 0.25rem; text-align: center; }
+      .bytes td.diff { background: #ffb4b4; font-weight: bold; }
+      .bytes td.split { border-left: 2px solid #777; }
+      input[type="number"] { width: 4rem; }
     </style>
   </head>
   <body>
     <h1>OpenPour web harness</h1>
     <p>
-      Connect one or two scales, then export a fixture for each. See
-      <code>harness/README.md</code> for prerequisites and troubleshooting.
+      Connect one or two scales, then export a fixture for each recording. See
+      <code>harness/README.md</code> for prerequisites, troubleshooting and investigating a
+      protocol.
     </p>
     <p id="support-problem" class="problem" hidden></p>
     <button id="connect" type="button">Connect a scale</button>
+    <button id="connect-listening" type="button">Connect listen-only</button>
     <p id="connect-problem" class="problem" hidden></p>
     <div id="scales"></div>
 
     <template id="scale-panel">
       <section class="scale">
         <h2 data-field="title">Scale</h2>
+        <p data-field="listen-warning" class="problem" hidden>
+          Listen-only: the page records what the scale sends but sends nothing, not even
+          heartbeats, so the scale may disconnect within seconds. Start session to keep it
+          connected.
+        </p>
         <dl>
           <dt>Connection</dt>
           <dd data-field="connection"></dd>
@@ -45,6 +66,10 @@
           <dd data-field="capabilities">–</dd>
           <dt>Weight</dt>
           <dd data-field="weight">–</dd>
+          <dt>Timer</dt>
+          <dd data-field="timer">–</dd>
+          <dt>Battery</dt>
+          <dd data-field="battery">–</dd>
           <dt>Bluetooth module</dt>
           <dd>reported by the radio chip, not the scale</dd>
           <dt>Manufacturer</dt>
@@ -58,11 +83,32 @@
           <dt>Software rev</dt>
           <dd data-field="softwareRevision">–</dd>
         </dl>
-        <button type="button" data-action="tare">Tare</button>
-        <button type="button" data-action="disconnect">Disconnect</button>
-        <button type="button" data-action="reconnect">Reconnect</button>
-        <button type="button" data-action="cancel" disabled>Cancel</button>
+        <p>
+          <button type="button" data-action="disconnect" disabled>Disconnect</button>
+          <button type="button" data-action="reconnect" disabled>Reconnect</button>
+          <button type="button" data-action="listen" disabled>Reconnect listen-only</button>
+          <button type="button" data-action="startSession" disabled>Start session</button>
+          <button type="button" data-action="cancel" disabled>Cancel</button>
+        </p>
+
+        <h3>Driver commands</h3>
+        <p>
+          <button type="button" data-action="tare" disabled>Tare</button>
+          <button type="button" data-action="timerStart" disabled>Start timer</button>
+          <button type="button" data-action="timerStop" disabled>Stop timer</button>
+          <button type="button" data-action="timerReset" disabled>Reset timer</button>
+          <button type="button" data-action="battery" disabled>Request battery</button>
+        </p>
+        <p data-field="commands" class="hint"></p>
+
+        <h3>Recordings</h3>
+        <p class="hint">
+          Every connection's recording stays here until you discard it. Fill these in, then
+          export any recording.
+        </p>
         <form>
+          <!-- The form's default button: disabled, so Enter in a field exports nothing. -->
+          <button type="submit" disabled hidden></button>
           <label>Model <input name="model" value="unknown" required /></label>
           <label>
             Model year
@@ -106,8 +152,47 @@
           <label
             >Detail <input name="scenarioDetail" placeholder="optional, e.g. oz or auto-tare"
           /></label>
-          <button type="submit">Export fixture</button>
+          <ol data-field="recordings"></ol>
         </form>
+
+        <h3>Log</h3>
+        <div data-part="log">
+          <p>
+            <label><input type="checkbox" name="pause" /> Pause display</label>
+            · Show
+            <label><input type="checkbox" name="show-tx" checked /> tx</label>
+            <label><input type="checkbox" name="show-rx" checked /> rx</label>
+            <label><input type="checkbox" name="show-reading" checked /> readings</label>
+            <label><input type="checkbox" name="show-event" checked /> other events</label>
+          </p>
+          <div class="log">
+            <table>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+
+        <h3>Compare packets</h3>
+        <div data-part="compare">
+          <p class="hint">
+            Click A or B on an rx row to mark it. Shift-click a later row to extend the mark over
+            a frame split across notifications. Pause the display first if rows are scrolling.
+          </p>
+          <p>A: <span data-compare="A">–</span></p>
+          <p>B: <span data-compare="B">–</span></p>
+          <div class="bytes"><table data-compare="bytes"></table></div>
+          <p data-compare="summary"></p>
+          <p>
+            <label>
+              Find earlier packets starting with the first
+              <input type="number" data-compare="prefix" min="1" />
+              bytes of A
+            </label>
+            <button type="button" data-compare="find" disabled>Find</button>
+          </p>
+          <ol data-compare="earlier"></ol>
+        </div>
+
         <h3>Errors and notes</h3>
         <ol data-field="errors"></ol>
       </section>

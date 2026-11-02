@@ -20,11 +20,40 @@ function describeReading({ grams, stable }: Reading): string {
   return `${grams} g${stable ? ", stable" : ""}`;
 }
 
+type TimerEvent = Extract<ScaleEvent, { type: "timer" }>;
+
+function describeTimer({ running, ms }: TimerEvent): string {
+  return `${running ? "running" : "stopped"}, ${ms / 1000} s`;
+}
+
+/** One line for a log row, from the decoded event alone. */
+export function describeScaleEvent(event: ScaleEvent): string {
+  switch (event.type) {
+    case "reading":
+      return `reading ${describeReading(event.reading)}`;
+    case "battery":
+      return `battery ${event.percent} %`;
+    case "timer":
+      return `timer ${describeTimer(event)}`;
+    case "button":
+      return `button ${event.button}`;
+    case "state":
+      return `state ${event.state}`;
+    case "error":
+      return `error ${describeError(event.error)}`;
+  }
+}
+
 function showScaleEvent(panel: ScalePanel, event: ScaleEvent): void {
   if (event.type === "state") panel.show("protocol", event.state);
   if (event.type === "reading") panel.show("weight", describeReading(event.reading));
+  if (event.type === "timer") panel.show("timer", describeTimer(event));
+  if (event.type === "battery") panel.show("battery", `${event.percent} %`);
   if (event.type === "error") panel.addError(`Scale error ${describeError(event.error)}`);
 }
+
+/** Readouts that come from the scale's events, so none outlives the connection. */
+const LIVE_FIELDS = ["weight", "timer", "battery"] as const;
 
 /** Shows what the runner reports; the start time and packets go to the recorder instead. */
 export function showRunnerEvent(
@@ -45,7 +74,7 @@ export function showRunnerEvent(
       break;
     case "disconnected":
       panel.setConnection("disconnected");
-      panel.show("weight", EMPTY_FIELD);
+      for (const field of LIVE_FIELDS) panel.show(field, EMPTY_FIELD);
       break;
   }
 }

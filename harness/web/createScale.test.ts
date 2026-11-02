@@ -1,85 +1,41 @@
-import type { Driver } from "openpour";
 import { acaia, NEW_STYLE_HEARTBEAT_MS, SUBSCRIBE_SETTLE_MS } from "openpour/acaia";
-import { bytesToHex, type Fixture, hexToBytes, parseFixture } from "openpour/replay";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
 import { ACAIA_VECTORS as RX, ACAIA_COMMAND_VECTORS as TX } from "../../src/test/acaiaVectors.js";
-import { ACAIA_GATT, ACAIA_NOTIFY, ACAIA_WRITE } from "../test/acaiaGatt.js";
-import { advanceTo, useFakeClock } from "../test/useFakeClock.js";
-import { createScale, RECORDING_REPLACED } from "./createScale.js";
-import { EMPTY_FIELD, type PanelAction } from "./createScalePanel.js";
-import { downloadText } from "./downloadText.js";
+import { ACAIA_GATT, ACAIA_WRITE } from "../test/acaiaGatt.js";
+import { advanceTo } from "../test/useFakeClock.js";
+import { EMPTY_FIELD } from "./createScalePanel.js";
 import { RECONNECT_RETRY_MS, RECONNECT_WINDOW_MS } from "./retryWhileOutOfRange.js";
 import {
-  asDevice,
+  click,
+  connectTo,
+  DEVICE_INFO_READS,
+  DISCOVERY,
+  exportFixture,
+  HANDSHAKE,
+  notifyHex,
+  pearlS,
+  recordingsShown,
+  shown,
+  TWO_SERVICE_DISCOVERY,
+  writtenHex,
+} from "./test/connectScale.js";
+import {
   BATTERY_ONLY_GATT,
   DEVICE_INFORMATION_GATT,
-  DIS,
-  notify,
   operationsOn,
-  readsAs,
-  type StubGatt,
   stubGatt,
 } from "./test/stubGatt.js";
-import { type StubPanel, stubPanel } from "./test/stubPanel.js";
+import type { StubPanel } from "./test/stubPanel.js";
 
 vi.mock("./downloadText.js");
-
-const DISCOVERY = ["connect", "getPrimaryServices", "getCharacteristics"];
-const HANDSHAKE = ["startNotifications", "writeValueWithoutResponse", "writeValueWithoutResponse"];
 
 afterEach(() => {
   vi.useRealTimers();
   vi.clearAllMocks();
 });
 
-function connectTo(gatt: StubGatt, driver: Driver = acaia) {
-  const clock = useFakeClock();
-  const panel = stubPanel();
-  const recordingStartT = vi.fn(() => 0);
-  const device = asDevice(gatt.device);
-  const scale = createScale({ device, label: "a", driver, clock, recordingStartT, panel });
-  return { clock, panel, recordingStartT, connected: scale.connect() };
-}
-
-/** Clicks the panel's `action` button, through the handler the scale registered for it. */
-function click(panel: StubPanel, action: PanelAction): void {
-  const handler = panel.onAction.mock.calls.find(([name]) => name === action)?.[1];
-  if (!handler) throw new Error(`no handler for ${action}`);
-  handler();
-}
-
-/** Submits the export form with `answers`; returns the downloaded fixture, if there was one. */
-function exportFixture(panel: StubPanel, answers = new FormData()): Fixture | undefined {
-  panel.onExport.mock.calls[0]?.[0](answers);
-  const jsonl = vi.mocked(downloadText).mock.calls.at(-1)?.[1];
-  return jsonl === undefined ? undefined : parseFixture(jsonl);
-}
-
-function weightsShown(panel: StubPanel): string[] {
-  return panel.show.mock.calls.flatMap(([field, text]) => (field === "weight" ? [text] : []));
-}
-
-function writtenHex({ characteristics }: StubGatt): string[] {
-  return characteristics.flatMap((c) =>
-    // The source writes Uint8Arrays.
-    [...c.writeValueWithResponse.mock.calls, ...c.writeValueWithoutResponse.mock.calls].map(
-      ([value]) => bytesToHex(value as Uint8Array),
-    ),
-  );
-}
-
-/** What a Pearl S lets the page see: the Acaia service and Device Information. */
-function pearlS(): StubGatt {
-  const gatt = stubGatt([...ACAIA_GATT, ...DEVICE_INFORMATION_GATT]);
-  readsAs(gatt, DIS.modelNumber, "PEARLS");
-  readsAs(gatt, DIS.serialNumber, "SERIAL-1234");
-  readsAs(gatt, DIS.firmwareRevision, "1.0.016");
-  return gatt;
-}
-
-const TWO_SERVICE_DISCOVERY = [...DISCOVERY, "getCharacteristics"];
-const DEVICE_INFO_READS = Array<string>(5).fill("readValue");
+const weightsShown = (panel: StubPanel): string[] => shown(panel, "weight");
 
 describe("createScale", () => {
   test("an unknown device is disconnected and reported, and no runner or recording starts", async () => {
@@ -104,9 +60,7 @@ describe("createScale", () => {
     const { clock, panel, connected } = connectTo(gatt);
     await connected;
     await advanceTo(clock, SUBSCRIBE_SETTLE_MS);
-    const notifier = gatt.characteristics.find(({ uuid }) => uuid === ACAIA_NOTIFY);
-    if (!notifier) throw new Error("no notify characteristic");
-    notify(notifier, new DataView(hexToBytes(RX.weight).buffer), clock.now());
+    notifyHex(gatt, RX.weight, clock.now());
     expect(weightsShown(panel).at(-1)).toContain("175.9 g");
 
     gatt.device.dispatchEvent(new Event("gattserverdisconnected"));
@@ -135,7 +89,7 @@ describe("createScale", () => {
     await connected;
     await advanceTo(clock, SUBSCRIBE_SETTLE_MS);
 
-    const fixture = exportFixture(panel);
+    const fixture = exportFixture(panel, 1);
 
     expect(fixture?.header).toMatchObject({ model: "unknown", firmware: "unknown" });
     expect(new Set(fixture?.records.map(({ chr }) => chr))).toEqual(new Set([ACAIA_WRITE]));
@@ -147,7 +101,7 @@ describe("createScale", () => {
     await connected;
     await advanceTo(clock, SUBSCRIBE_SETTLE_MS);
 
-    const fixture = exportFixture(panel);
+    const fixture = exportFixture(panel, 1);
 
     expect(fixture?.header.sessionStartT).toBe(0);
     expect(fixture?.records[0]?.t).toBe(SUBSCRIBE_SETTLE_MS);
@@ -172,7 +126,7 @@ describe("createScale and device identifiers", () => {
       const answers = new FormData();
       answers.set(name, "PEARLSD9F8BC");
 
-      expect(exportFixture(panel, answers)).toBeUndefined();
+      expect(exportFixture(panel, 1, answers)).toBeUndefined();
       expect(panel.addError).toHaveBeenCalledExactlyOnceWith(
         expect.stringContaining(`${name} "PEARLSD9F8BC" contains D9F8BC`),
       );
@@ -213,7 +167,7 @@ describe("createScale controls", () => {
     const reconnectT = 5000;
     const gatt = stubGatt(ACAIA_GATT);
     const driver = { ...acaia, createSession: vi.fn(acaia.createSession) };
-    const { clock, panel, recordingStartT, connected } = connectTo(gatt, driver);
+    const { clock, panel, recordingStartT, connected } = connectTo(gatt, { driver });
     await connected;
     await advanceTo(clock, SUBSCRIBE_SETTLE_MS);
     click(panel, "disconnect");
@@ -226,7 +180,7 @@ describe("createScale controls", () => {
     expect(operationsOn(gatt).slice(before)).toEqual([...DISCOVERY, ...HANDSHAKE]);
     expect(driver.createSession).toHaveBeenCalledTimes(2);
     expect(recordingStartT).toHaveBeenCalledTimes(2);
-    const fixture = exportFixture(panel);
+    const fixture = exportFixture(panel, 2);
     expect(fixture?.header.sessionStartT).toBe(reconnectT);
     expect(fixture?.records.map(({ t, hex }) => [t, hex])).toEqual([
       [reconnectT + SUBSCRIBE_SETTLE_MS, TX.identify],
@@ -234,20 +188,60 @@ describe("createScale controls", () => {
     ]);
   });
 
-  test("Reconnect says when it replaces a recording that has packets, and only then", async () => {
+  test("Reconnect keeps the earlier recording, which still exports on its own", async () => {
+    const reconnectT = 5000;
+    const gatt = stubGatt(ACAIA_GATT);
+    const { clock, panel, connected } = connectTo(gatt);
+    await connected;
+    await advanceTo(clock, 300);
+    notifyHex(gatt, RX.settings, 300);
+    click(panel, "disconnect");
+    await advanceTo(clock, reconnectT);
+    click(panel, "reconnect");
+    await advanceTo(clock, reconnectT + 300);
+    notifyHex(gatt, RX.weight, reconnectT + 300);
+
+    expect(recordingsShown(panel)).toEqual([
+      { id: 1, text: "#1 session, ended, 3 packets", canDiscard: true },
+      { id: 2, text: "#2 session, live", canDiscard: false },
+    ]);
+    const first = exportFixture(panel, 1);
+    expect(first?.header.sessionStartT).toBe(0);
+    expect(first?.records.map(({ t, hex }) => [t, hex])).toEqual([
+      [SUBSCRIBE_SETTLE_MS, TX.identify],
+      [SUBSCRIBE_SETTLE_MS, TX.notificationRequest],
+      [300, RX.settings],
+    ]);
+    const second = exportFixture(panel, 2);
+    expect(second?.header.sessionStartT).toBe(reconnectT);
+    expect(second?.records.map(({ hex }) => hex)).toEqual([
+      TX.identify,
+      TX.notificationRequest,
+      RX.weight,
+    ]);
+    expect(recordingsShown(panel)?.[0]?.text).toBe(
+      "#1 session, ended, 3 packets, exported as unknown_fwunknown_unknown-a.jsonl",
+    );
+  });
+
+  test("Discard drops an ended recording for good, but never the live one", async () => {
     const { clock, panel, connected } = connectTo(stubGatt(ACAIA_GATT));
     await connected;
-    // Disconnected before the handshake's first write: nothing recorded, nothing to lose.
-    click(panel, "disconnect");
-    click(panel, "reconnect");
     await advanceTo(clock, SUBSCRIBE_SETTLE_MS);
-    expect(panel.addNote).not.toHaveBeenCalled();
-
     click(panel, "disconnect");
     click(panel, "reconnect");
-    await vi.advanceTimersByTimeAsync(0);
+    await advanceTo(clock, 2 * SUBSCRIBE_SETTLE_MS);
+    const discard = panel.onDiscard.mock.calls[0]?.[0];
 
-    expect(panel.addNote).toHaveBeenCalledExactlyOnceWith(RECORDING_REPLACED);
+    discard?.(2);
+    discard?.(1);
+
+    expect(recordingsShown(panel)?.map(({ id }) => id)).toEqual([2]);
+    expect(exportFixture(panel, 1)).toBeUndefined();
+    expect(panel.addError.mock.calls).toEqual([
+      ["Recording #2 is live: disconnect first."],
+      ["Choose a recording to export."],
+    ]);
   });
 });
 
