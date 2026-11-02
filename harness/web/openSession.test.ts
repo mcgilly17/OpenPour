@@ -4,8 +4,7 @@ import { afterEach, describe, expect, test, vi } from "vitest";
 import { ACAIA_GATT } from "../test/acaiaGatt.js";
 import { advanceTo, useFakeClock } from "../test/useFakeClock.js";
 import { CONNECT_TIMEOUT_MS, openSession } from "./openSession.js";
-import { BATTERY_ONLY_GATT } from "./test/batteryOnlyGatt.js";
-import { asDevice, operationsOn, stubGatt } from "./test/stubGatt.js";
+import { asDevice, BATTERY_ONLY_GATT, operationsOn, stubGatt } from "./test/stubGatt.js";
 
 const DISCOVERY = ["connect", "getPrimaryServices", "getCharacteristics"];
 

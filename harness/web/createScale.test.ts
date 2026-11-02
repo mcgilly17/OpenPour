@@ -7,8 +7,13 @@ import { advanceTo, useFakeClock } from "../test/useFakeClock.js";
 import { createScale } from "./createScale.js";
 import type { ScalePanel } from "./createScalePanel.js";
 import { downloadText } from "./downloadText.js";
-import { BATTERY_ONLY_GATT } from "./test/batteryOnlyGatt.js";
-import { asDevice, operationsOn, type StubGatt, stubGatt } from "./test/stubGatt.js";
+import {
+  asDevice,
+  BATTERY_ONLY_GATT,
+  operationsOn,
+  type StubGatt,
+  stubGatt,
+} from "./test/stubGatt.js";
 
 vi.mock("./downloadText.js");
 
