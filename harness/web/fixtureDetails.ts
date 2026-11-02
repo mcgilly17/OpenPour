@@ -20,7 +20,7 @@ const FREE_TEXT_ANSWERS = ["model", "firmware", "scenario"] as const;
 export function identifierProblem(name: string, value: string): string | undefined {
   const run = IDENTIFIER_LIKE.exec(value)?.[0];
   if (run === undefined) return undefined;
-  return `${name} "${value}" contains ${run}, which looks like a device identifier (6 or more hex digits in a row). Fixtures are public: remove it before exporting.`;
+  return `${name} "${value}" contains ${run}, which looks like a device identifier (6 or more hex digits in a row). Fixtures are public: remove it.`;
 }
 
 /** The chosen scenario, with the optional free-text detail appended, e.g. "C12-units-oz". */
