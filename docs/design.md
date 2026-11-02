@@ -30,7 +30,7 @@ fixtures/<brand>/       scrubbed JSONL captures (ADR 0013)
 spec/<brand>.md         protocol facts, each tied to a fixture (ADR 0015)
 harness/                dev-only live harness, never published
   runner/               Bluetooth source port, session runner, listening source, recorder, fake source
-  web/                  Web Bluetooth source and the browser page
+  web/                  Web Bluetooth source and the React page; shadcn/ui components in components/ui/
 scripts/                dev-only Node scripts: the harness launcher, packaging check
 ```
 

@@ -28,7 +28,8 @@ pnpm harness
 rebuilding them as `src/` changes, and serves the page at
 <http://localhost:5173> (the next free port if that one is taken). Open it in
 Chrome or Edge. A rebuild reloads the page, which drops any connected scales.
-Stop with Ctrl-C.
+Stop with Ctrl-C. `pnpm harness --port 5180` serves on that port instead, and
+stops with an error if it is taken.
 
 ## Secure context
 
@@ -60,28 +61,30 @@ counts time from that moment so two scales line up. Each fixture's header also
 notes when its session started (`sessionStartT`, ADR 0018), so replay sends the
 session's handshake and heartbeats at their recorded times. A fixture holds
 every notification, every read the session asked for, and every write that
-succeeded, timed when it was sent. A failed write is listed under the panel's
+succeeded, timed when it was sent. A failed write is listed under the card's
 errors and notes, and left out of the fixture. Device Information reads are
 never recorded.
 
-Each connection gets its own recording, and the panel keeps every one in its
+Each connection gets its own recording, and the scale's card keeps every one in its
 **Recordings** list until you **Discard** it, so a reconnect never loses one.
 Fill in model, model year and firmware (leave `unknown` when you don't know),
-choose a scenario (a check ID from `docs/checks.md` or an investigation such as
-`settings-change`) and add a detail if it helps, such as `sound-off`. Then
+choose a **Scenario** (a check ID from `docs/checks.md` or an investigation such as
+`settings-change`) and add a **Detail** if it helps, such as `sound-off`. Then
 **Export** the recording you want; a live recording exports everything so far.
+The browser refuses an export without a scenario, or with a model year that is
+neither a year nor `unknown`.
 Reloading the page drops every recording, so export before stopping
 `pnpm harness` or changing `src/`.
 
 Fixtures are public, so they never contain the browser's device ID. The end of
-a scale's advertised name can come from its hardware address, so the panel
+a scale's advertised name can come from its hardware address, so the card
 shows only the brand and the matched prefix, such as "Acaia PEARL". Export
 refuses a model, firmware or scenario detail with 6 or more hex digits in a row, which
 looks like such an identifier.
 
 ## Log
 
-Each panel's log shows every packet as it happens, tx or rx, one row per
+Each card's log shows every packet as it happens, tx or rx, one row per
 notification or write, so you can see where the scale split a frame. The
 events the driver decoded from a packet sit directly after it. Times are ms on
 the fixture's time base, and the hex is exactly what the recording exports. A
@@ -90,14 +93,22 @@ arrived meanwhile; its time is when it was sent.
 
 The log keeps its last 300 rows (`LOG_ROWS_SHOWN`); recordings keep
 everything. **Pause display** freezes the rows on screen while recording
-carries on, and the checkboxes hide tx, rx, readings or other events.
+carries on, until **Resume display**, and the checkboxes hide tx, rx, readings
+or other events. Each rx row starts with its **A** and **B** buttons for
+comparing packets.
 
 ## Driver commands
 
 The **Driver commands** buttons run the session's own tare, timer start, stop
-and reset, and battery request. The page writes no other bytes. A command the
-driver declares unsupported stays disabled, with the reason under the
-buttons. **Timer** and **Battery** show the latest timer and battery events.
+and reset, and battery request. The page writes no other bytes. A command that
+can't be sent, because the driver declares it unsupported or no session is
+running, stays disabled: hovering it shows why, and the reasons are listed
+under the buttons. **Timer** and **Battery** show the latest timer and battery
+events.
+
+The connection buttons follow the scale's state the same way: **Reconnect**
+works only once the connection has closed, so one scale never has two
+sessions.
 
 ## Listen-only
 
@@ -112,7 +123,7 @@ The listening stretch is a recording of its own. Its fixture has no
 `sessionStartT`, because no session ran during it. The session's recording
 starts at **Start session**, so its fixture replays with the same writes: ADR
 0018 allows no packet before a fixture's session start. A scale drops a
-connection that sends no heartbeats within a few seconds, and the panel says
+connection that sends no heartbeats within a few seconds, and the card says
 so while listening.
 
 ## Investigating a protocol
@@ -147,6 +158,26 @@ only where a notification starts.
 To see what a scale sends before any session reacts, such as a frame that
 arrives right after subscribing, use **Connect listen-only**, wait a moment,
 then **Start session** before the scale gives up.
+
+## The page's code
+
+The page is React, styled with Tailwind CSS and built from
+[shadcn/ui](https://ui.shadcn.com) components, all dev-only. The shadcn/ui
+components are copied into `web/components/ui/` with their MIT licence, so the
+page fetches nothing at runtime. `scripts/harness.ts` adds Vite's React and
+Tailwind plugins; there is no Vite config file.
+
+- `createScale` connects one scale and holds its logic. It writes to the
+  scale's panel (`createScalePanel`), a small store, and never touches the
+  DOM, so its tests drive it with a stub panel and no browser.
+- `ScaleCard` renders a panel's state with `useSyncExternalStore` and passes
+  clicks back to it. Each part of the card (`Readouts`, `CommandBar`,
+  `RecordingsSection`, `LogTable`, `ComparePanel`) is its own component; a new
+  part, such as a GATT browser, a check list or a weight plot, is another
+  section in `ScaleCard`.
+- Logic lives in plain modules with their own tests. Component tests
+  (`*.test.tsx`, jsdom) cover what a view decides itself, such as the scenario
+  dropdown feeding the export.
 
 ## Troubleshooting
 
