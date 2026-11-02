@@ -205,8 +205,14 @@ describe("createScale controls", () => {
       { id: 1, text: "#1 session, ended, 3 packets", canDiscard: true },
       { id: 2, text: "#2 session, live", canDiscard: false },
     ]);
-    const first = exportFixture(panel, 1);
-    expect(first?.header.sessionStartT).toBe(0);
+    const answers = new FormData();
+    answers.set("scenario", "settings-change");
+    answers.set("scenarioDetail", "sound-off");
+    const first = exportFixture(panel, 1, answers);
+    expect(first?.header).toMatchObject({
+      scenario: "settings-change-sound-off-a",
+      sessionStartT: 0,
+    });
     expect(first?.records.map(({ t, hex }) => [t, hex])).toEqual([
       [SUBSCRIBE_SETTLE_MS, TX.identify],
       [SUBSCRIBE_SETTLE_MS, TX.notificationRequest],
@@ -220,7 +226,7 @@ describe("createScale controls", () => {
       RX.weight,
     ]);
     expect(recordingsShown(panel)?.[0]?.text).toBe(
-      "#1 session, ended, 3 packets, exported as unknown_fwunknown_unknown-a.jsonl",
+      "#1 session, ended, 3 packets, exported as unknown_fwunknown_settings-change-sound-off-a.jsonl",
     );
   });
 
