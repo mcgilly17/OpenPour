@@ -225,8 +225,7 @@ Verified facts move into `spec/acaia.md`, each tied to the fixture that proves i
 
 ### Observed on hardware (smoke tests, not yet fixture-backed)
 
-First live-harness sessions on a Pearl S (2022, firmware 1.0.008, updated to
-1.0.009 A afterwards) and a
+First live-harness sessions on a Pearl S (2022, firmware 1.0.008) and a
 Lunar (2021 per its owner, firmware 1.0.019 A). These are observations, not verified facts: each moves to
 `spec/acaia.md` only with a committed fixture (1.1, 1.5b).
 
@@ -244,13 +243,13 @@ Lunar (2021 per its owner, firmware 1.0.019 A). These are observations, not veri
   "Lunar 2021+ is new style" note above; it decoded on the first attempt.
   Whether "2021" is the model generation or the purchase year is unconfirmed. It splits every frame after `EF DD 0C`; the Pearl S splits at
   arbitrary points.
-- **The type 7 frame carries a version-like triplet, not yet proven to be
-  firmware.** It can arrive immediately after subscribing (on some Pearl S
-  connections, not others): length `07`, payload `03 5C 01 00 08 01`. Payload
-  bytes 2–4 read 1.0.8, matching the scale's firmware 1.0.008 at the time; after
-  an update to 1.0.009 the frame still read 1.0.8. Bytes 0–1 differ between
-  models and are unknown. The session currently treats the frame only as "send
-  identify again".
+- **The type 7 frame carries a version-like triplet, probably the firmware.**
+  It can arrive immediately after subscribing (on some Pearl S connections, not
+  others): length `07`, payload `03 5C 01 00 08 01`. Payload bytes 2–4 read
+  1.0.8, matching the scale's firmware 1.0.008 on two captures (an attempted
+  update to 1.0.009 had not applied). Not yet seen to change with a firmware
+  change. Bytes 0–1 differ between models and are unknown. The session
+  currently treats the frame only as "send identify again".
 - **Battery** arrives unrequested about every 20 s on the Pearl S. On the Lunar
   a settings frame byte of `0x4E` decoded as 78%, and the vendor app showed 78%
   at the same time (bit 7 clear; read as "timer not running" by other sources).
