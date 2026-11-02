@@ -254,12 +254,14 @@ Lunar (2021 per its owner, firmware 1.0.019 A). These are observations, not veri
 - **Battery** arrives unrequested about every 20 s on the Pearl S. On the Lunar
   a settings frame byte of `0x4E` decoded as 78%, and the vendor app showed 78%
   at the same time (bit 7 clear; read as "timer not running" by other sources).
-- **Lunar settings frame** (`EF DD 08`, length `09`): `4E 02 01 01 00 01 01`.
-  Against the vendor app: auto-off code `01` matched "5 minutes" and sound `01`
-  matched "on". The app also showed touch on, auto connect on and max weight
-  1000 g. Changing only max weight from 2000 g to 1000 g flipped only the last
-  byte, `01` to `00` (other sources call it resolution). Touch, auto connect and
-  the remaining bytes (`01`, `00`) are not yet placed.
+- **Lunar settings frame** (`EF DD 08`, length `09`, then 8 setting bytes):
+  `4E 02 01 01 00 01 01 01` with max weight 2000 g and touch on. Against the
+  vendor app: auto-off `01` matched "5 minutes" and sound `01` matched "on".
+  Changing one setting at a time:
+  - max weight 2000 g → 1000 g flipped only the last byte, `01` → `00`;
+  - touch on → off changed only the fifth byte, `00` → `5D`, an odd value for a
+    switch; unconfirmed until touch is turned back on.
+    Auto connect and the other bytes are not yet placed.
 - **Timer record on the old Lunar:** every weight frame carries `07 00 00 02`,
   which decodes as "stopped at 0.2 s" and never changes while the timer is
   idle. Unverified until the timer is run (check C9).
