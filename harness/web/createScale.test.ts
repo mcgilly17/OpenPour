@@ -136,6 +136,32 @@ describe("createScale", () => {
   });
 });
 
+describe("createScale and device identifiers", () => {
+  test("the title shows the brand and matched name prefix, never the rest of the name", async () => {
+    const { panel, connected } = connectTo(stubGatt(ACAIA_GATT, "PEARLSD9F8BC"));
+    await connected;
+
+    expect(panel.show).toHaveBeenCalledWith("title", "Scale a: Acaia PEARL");
+    expect(JSON.stringify(panel.show.mock.calls)).not.toContain("D9F8BC");
+  });
+
+  test.each(["model", "firmware", "scenario"])(
+    "refuses to export a %s that looks like a device identifier",
+    async (name) => {
+      const { clock, panel, connected } = connectTo(stubGatt(ACAIA_GATT));
+      await connected;
+      await advanceTo(clock, SUBSCRIBE_SETTLE_MS);
+      const answers = new FormData();
+      answers.set(name, "PEARLSD9F8BC");
+
+      expect(exportFixture(panel, answers)).toBeUndefined();
+      expect(panel.addError).toHaveBeenCalledExactlyOnceWith(
+        expect.stringContaining(`${name} "PEARLSD9F8BC" contains D9F8BC`),
+      );
+    },
+  );
+});
+
 describe("createScale controls", () => {
   test("Tare sends one tare write", async () => {
     const gatt = stubGatt(ACAIA_GATT);

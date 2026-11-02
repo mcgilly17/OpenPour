@@ -33,6 +33,15 @@ export interface Scale {
   connect(): Promise<void>;
 }
 
+/**
+ * The brand and the name prefix the device matched, e.g. "Acaia PEARL". The rest of an advertised
+ * name can be derived from the scale's address, so it is never shown where it could be copied.
+ */
+function publicName(driver: Driver, name: string | undefined): string {
+  const prefix = driver.namePrefixes.find((namePrefix) => name?.startsWith(namePrefix));
+  return prefix === undefined ? driver.brand : `${driver.brand} ${prefix}`;
+}
+
 /** Connects one chosen device and wires its panel: controls, readouts and fixture export. */
 export function createScale(options: ScaleOptions): Scale {
   const { device, label, driver, clock, recordingStartT, panel } = options;
@@ -82,7 +91,7 @@ export function createScale(options: ScaleOptions): Scale {
     }
   }
 
-  panel.show("title", `Scale ${label}: ${device.name ?? "unnamed"}`);
+  panel.show("title", `Scale ${label}: ${publicName(driver, device.name)}`);
   panel.onAction("tare", () => connection?.runner.tare());
   panel.onAction("disconnect", () => void connection?.runner.disconnect());
   panel.onAction("reconnect", () => void connect());

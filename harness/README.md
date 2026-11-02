@@ -52,10 +52,16 @@ notes when its session started (`sessionStartT`, ADR 0018), so replay sends the
 session's handshake and heartbeats at their recorded times. A fixture holds
 every notification and read result, and every write that succeeded, timed when
 it was sent. A failed write is listed under the panel's errors and left out of
-the fixture. Each connection records its own traffic: **Reconnect** starts a fresh session and a new
-recording, so export first. To export, fill in model, model year and firmware
-(leave `unknown` when you don't know) and a scenario, then **Export fixture**.
-Fixtures never contain the browser's device ID.
+the fixture. Each connection records its own traffic: **Reconnect** starts a
+fresh session and a new recording, so export first. To export, fill in model,
+model year and firmware (leave `unknown` when you don't know) and a scenario,
+then **Export fixture**.
+
+Fixtures are public, so they never contain the browser's device ID. The end of
+a scale's advertised name can come from its hardware address, so the panel
+shows only the brand and the matched prefix, such as "Acaia PEARL". Export
+refuses a model, firmware or scenario with 6 or more hex digits in a row, which
+looks like such an identifier.
 
 ## Troubleshooting
 
@@ -70,3 +76,4 @@ Fixtures never contain the browser's device ID.
 | unknown-device                         | The scale connected but has none of the driver's services: a different scale, or a protocol variant the driver doesn't know yet.                                                  |
 | … timed out after 3000 ms              | A Bluetooth operation stalled. The page moves on to the next command; if errors keep coming, disconnect and reconnect.                                                            |
 | disconnected, without a click          | The scale dropped the connection, slept, or `src/` was rebuilt and the page reloaded.                                                                                             |
+| looks like a device identifier         | An export answer has 6 or more hex digits in a row, such as a serial number, an address or a compact date. Reword it; write a date with dashes.                                   |
