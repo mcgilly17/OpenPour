@@ -6,7 +6,7 @@ import { afterEach, describe, expect, test, vi } from "vitest";
 import { ACAIA_VECTORS as RX, ACAIA_COMMAND_VECTORS as TX } from "../../src/test/acaiaVectors.js";
 import { ACAIA_GATT, ACAIA_NOTIFY } from "../test/acaiaGatt.js";
 import { advanceTo, useFakeClock } from "../test/useFakeClock.js";
-import { createScale } from "./createScale.js";
+import { createScale, RECORDING_REPLACED } from "./createScale.js";
 import { EMPTY_FIELD, type PanelAction, type ScalePanel } from "./createScalePanel.js";
 import { downloadText } from "./downloadText.js";
 import {
@@ -33,6 +33,7 @@ function stubPanel() {
     show: vi.fn(),
     setConnection: vi.fn(),
     addError: vi.fn(),
+    addNote: vi.fn(),
     onAction: vi.fn(),
     onExport: vi.fn(),
   } satisfies ScalePanel;
@@ -214,5 +215,21 @@ describe("createScale controls", () => {
       [reconnectT + SUBSCRIBE_SETTLE_MS, TX.identify],
       [reconnectT + SUBSCRIBE_SETTLE_MS, TX.notificationRequest],
     ]);
+  });
+
+  test("Reconnect says when it replaces a recording that has packets, and only then", async () => {
+    const { clock, panel, connected } = connectTo(stubGatt(ACAIA_GATT));
+    await connected;
+    // Disconnected before the handshake's first write: nothing recorded, nothing to lose.
+    click(panel, "disconnect");
+    click(panel, "reconnect");
+    await advanceTo(clock, SUBSCRIBE_SETTLE_MS);
+    expect(panel.addNote).not.toHaveBeenCalled();
+
+    click(panel, "disconnect");
+    click(panel, "reconnect");
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(panel.addNote).toHaveBeenCalledExactlyOnceWith(RECORDING_REPLACED);
   });
 });

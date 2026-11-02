@@ -33,6 +33,9 @@ export interface Scale {
   connect(): Promise<void>;
 }
 
+export const RECORDING_REPLACED =
+  "The previous recording was replaced by this connection's. Export before reconnecting to keep a recording.";
+
 /**
  * The brand and the name prefix the device matched, e.g. "Acaia PEARL". The rest of an advertised
  * name can be derived from the scale's address, so it is never shown where it could be copied.
@@ -68,7 +71,9 @@ export function createScale(options: ScaleOptions): Scale {
     panel.setConnection("connecting");
     panel.show("protocol", EMPTY_FIELD);
     try {
-      connection = start(await openSession(device, driver, clock));
+      const next = start(await openSession(device, driver, clock));
+      if (connection?.recorder.hasPackets()) panel.addNote(RECORDING_REPLACED);
+      connection = next;
       panel.setConnection("connected");
     } catch (error) {
       panel.setConnection("failed");

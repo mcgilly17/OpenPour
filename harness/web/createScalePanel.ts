@@ -20,6 +20,8 @@ export interface ScalePanel {
   show(field: PanelField, text: string): void;
   setConnection(state: ConnectionState): void;
   addError(text: string): void;
+  /** Something worth knowing that isn't a failure; it joins the same list, marked as a note. */
+  addNote(text: string): void;
   onAction(action: PanelAction, handler: () => void): void;
   /** Gets the export form's answers once the browser has validated them. */
   onExport(handler: (answers: FormData) => void): void;
@@ -40,6 +42,13 @@ export function createScalePanel(container: Element): ScalePanel {
     field(name).textContent = text;
   }
 
+  function addLine(text: string): void {
+    addErrorLine(errorLines, text);
+    const item = (line: ErrorLine) =>
+      Object.assign(document.createElement("li"), { textContent: describeErrorLine(line) });
+    field("errors").replaceChildren(...errorLines.map(item));
+  }
+
   return {
     show,
     setConnection(state) {
@@ -48,12 +57,8 @@ export function createScalePanel(container: Element): ScalePanel {
       button("disconnect").disabled = state !== "connected";
       button("reconnect").disabled = state === "connected" || state === "connecting";
     },
-    addError(text) {
-      addErrorLine(errorLines, text);
-      const item = (line: ErrorLine) =>
-        Object.assign(document.createElement("li"), { textContent: describeErrorLine(line) });
-      field("errors").replaceChildren(...errorLines.map(item));
-    },
+    addError: addLine,
+    addNote: (text) => addLine(`Note: ${text}`),
     onAction(action, handler) {
       button(action).addEventListener("click", handler);
     },
