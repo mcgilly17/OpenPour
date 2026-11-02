@@ -12,7 +12,7 @@ function stubBluetooth() {
 }
 
 describe("chooseScale", () => {
-  test("asks only for devices named like the driver's scales, with access to its services", async () => {
+  test("asks only for devices named like the driver's scales, with access to its services and Device Information", async () => {
     const bluetooth = stubBluetooth();
 
     await expect(chooseScale(bluetooth, acaia)).resolves.toBe(bluetooth.device);
@@ -30,6 +30,7 @@ describe("chooseScale", () => {
       optionalServices: [
         "49535343-fe7d-4ae5-8fa9-9fafd205e455",
         "00001820-0000-1000-8000-00805f9b34fb",
+        "0000180a-0000-1000-8000-00805f9b34fb",
       ],
     });
   });

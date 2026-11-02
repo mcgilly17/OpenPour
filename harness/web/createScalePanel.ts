@@ -1,9 +1,19 @@
 import { addErrorLine, describeErrorLine, type ErrorLine } from "./errorLines.js";
 import { findElement } from "./findElement.js";
+import type { DeviceInfoField } from "./readDeviceInfo.js";
 
 export type ConnectionState = "connecting" | "waiting" | "connected" | "disconnected" | "failed";
-export type PanelField = "title" | "connection" | "protocol" | "info" | "capabilities" | "weight";
+export type PanelField =
+  | "title"
+  | "connection"
+  | "protocol"
+  | "info"
+  | "capabilities"
+  | "weight"
+  | DeviceInfoField;
 export type PanelAction = "tare" | "disconnect" | "reconnect" | "cancel";
+/** Export form answers the page can fill in from what the scale reports. */
+export type PrefilledAnswer = "model" | "firmware";
 
 /** A field with nothing to show, so a stale value never reads as live. */
 export const EMPTY_FIELD = "–";
@@ -24,6 +34,8 @@ export interface ScalePanel {
   /** Something worth knowing that isn't a failure; it joins the same list, marked as a note. */
   addNote(text: string): void;
   onAction(action: PanelAction, handler: () => void): void;
+  /** Fills in an export form answer; it stays editable. */
+  prefill(answer: PrefilledAnswer, value: string): void;
   /** Gets the export form's answers once the browser has validated them. */
   onExport(handler: (answers: FormData) => void): void;
 }
@@ -63,6 +75,9 @@ export function createScalePanel(container: Element): ScalePanel {
     addNote: (text) => addLine(`Note: ${text}`),
     onAction(action, handler) {
       button(action).addEventListener("click", handler);
+    },
+    prefill(answer, value) {
+      findElement(form, `input[name="${answer}"]`, HTMLInputElement).value = value;
     },
     onExport(handler) {
       form.addEventListener("submit", (event) => {

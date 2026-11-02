@@ -9,6 +9,7 @@ import { describeError, explainConnectFailure } from "./explainFailure.js";
 import { fixtureDetails } from "./fixtureDetails.js";
 import { type OpenedSession, openSession } from "./openSession.js";
 import { retryWhileOutOfRange } from "./retryWhileOutOfRange.js";
+import { showDeviceInfo } from "./showDeviceInfo.js";
 import { describeCapabilities, describeInfo, showRunnerEvent } from "./showRunnerEvent.js";
 
 export interface ScaleOptions {
@@ -56,10 +57,11 @@ export function createScale(options: ScaleOptions): Scale {
   let connection: Connection | undefined;
   let cancelWaiting: (() => void) | undefined;
 
-  function start({ server, characteristics, session }: OpenedSession): Connection {
+  function start({ server, characteristics, session, deviceInfo }: OpenedSession): Connection {
     const recorder = createRecorder({ startT: recordingStartT(), label });
     panel.show("info", describeInfo(session.info));
     panel.show("capabilities", describeCapabilities(session.capabilities));
+    showDeviceInfo(panel, deviceInfo);
     const runner = startRunner({
       source: createWebBluetoothSource({ server, characteristics, clock }),
       session,

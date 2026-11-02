@@ -4,20 +4,24 @@ import { bytesToHex, type Fixture, hexToBytes, parseFixture } from "openpour/rep
 import { afterEach, describe, expect, test, vi } from "vitest";
 
 import { ACAIA_VECTORS as RX, ACAIA_COMMAND_VECTORS as TX } from "../../src/test/acaiaVectors.js";
-import { ACAIA_GATT, ACAIA_NOTIFY } from "../test/acaiaGatt.js";
+import { ACAIA_GATT, ACAIA_NOTIFY, ACAIA_WRITE } from "../test/acaiaGatt.js";
 import { advanceTo, useFakeClock } from "../test/useFakeClock.js";
 import { createScale, RECORDING_REPLACED } from "./createScale.js";
-import { EMPTY_FIELD, type PanelAction, type ScalePanel } from "./createScalePanel.js";
+import { EMPTY_FIELD, type PanelAction } from "./createScalePanel.js";
 import { downloadText } from "./downloadText.js";
 import { RECONNECT_RETRY_MS, RECONNECT_WINDOW_MS } from "./retryWhileOutOfRange.js";
 import {
   asDevice,
   BATTERY_ONLY_GATT,
+  DEVICE_INFORMATION_GATT,
+  DIS,
   notify,
   operationsOn,
+  readsAs,
   type StubGatt,
   stubGatt,
 } from "./test/stubGatt.js";
+import { type StubPanel, stubPanel } from "./test/stubPanel.js";
 
 vi.mock("./downloadText.js");
 
@@ -28,19 +32,6 @@ afterEach(() => {
   vi.useRealTimers();
   vi.clearAllMocks();
 });
-
-function stubPanel() {
-  return {
-    show: vi.fn(),
-    setConnection: vi.fn(),
-    addError: vi.fn(),
-    addNote: vi.fn(),
-    onAction: vi.fn(),
-    onExport: vi.fn(),
-  } satisfies ScalePanel;
-}
-
-type StubPanel = ReturnType<typeof stubPanel>;
 
 function connectTo(gatt: StubGatt, driver: Driver = acaia) {
   const clock = useFakeClock();
@@ -78,15 +69,27 @@ function writtenHex({ characteristics }: StubGatt): string[] {
   );
 }
 
+/** What a Pearl S lets the page see: the Acaia service and Device Information. */
+function pearlS(): StubGatt {
+  const gatt = stubGatt([...ACAIA_GATT, ...DEVICE_INFORMATION_GATT]);
+  readsAs(gatt, DIS.modelNumber, "PEARLS");
+  readsAs(gatt, DIS.serialNumber, "SERIAL-1234");
+  readsAs(gatt, DIS.firmwareRevision, "1.0.016");
+  return gatt;
+}
+
+const TWO_SERVICE_DISCOVERY = [...DISCOVERY, "getCharacteristics"];
+const DEVICE_INFO_READS = Array<string>(5).fill("readValue");
+
 describe("createScale", () => {
   test("an unknown device is disconnected and reported, and no runner or recording starts", async () => {
-    const gatt = stubGatt(BATTERY_ONLY_GATT, "PEARL x");
+    const gatt = stubGatt([...BATTERY_ONLY_GATT, ...DEVICE_INFORMATION_GATT], "PEARL x");
     const { clock, panel, recordingStartT, connected } = connectTo(gatt);
 
     await connected;
     await advanceTo(clock, 10_000);
 
-    expect(operationsOn(gatt)).toEqual([...DISCOVERY, "disconnect"]);
+    expect(operationsOn(gatt)).toEqual([...TWO_SERVICE_DISCOVERY, "disconnect"]);
     expect(panel.setConnection.mock.calls).toEqual([["connecting"], ["failed"]]);
     expect(panel.addError).toHaveBeenCalledExactlyOnceWith(
       expect.stringContaining("(unknown-device)"),
@@ -112,18 +115,38 @@ describe("createScale", () => {
     expect(weightsShown(panel).at(-1)).toBe(EMPTY_FIELD);
   });
 
-  test("a matching scale is only discovered until its session asks to subscribe; writes follow", async () => {
-    const gatt = stubGatt(ACAIA_GATT);
+  test("a matching scale is only discovered and read until its session asks to subscribe; writes follow", async () => {
+    const gatt = pearlS();
     const { clock, panel, connected } = connectTo(gatt);
 
     await connected;
     await advanceTo(clock, SUBSCRIBE_SETTLE_MS - 1);
-    expect(operationsOn(gatt)).toEqual([...DISCOVERY, "startNotifications"]);
+    const opened = [...TWO_SERVICE_DISCOVERY, ...DEVICE_INFO_READS];
+    expect(operationsOn(gatt)).toEqual([...opened, "startNotifications"]);
     await advanceTo(clock, SUBSCRIBE_SETTLE_MS);
 
-    expect(operationsOn(gatt)).toEqual([...DISCOVERY, ...HANDSHAKE]);
+    expect(operationsOn(gatt)).toEqual([...opened, ...HANDSHAKE]);
     expect(panel.setConnection.mock.calls).toEqual([["connecting"], ["connected"]]);
     expect(panel.show).toHaveBeenCalledWith("protocol", "handshaking");
+  });
+
+  test("Device Information fills the export form and reaches the fixture only through it", async () => {
+    const { clock, panel, connected } = connectTo(pearlS());
+    await connected;
+    await advanceTo(clock, SUBSCRIBE_SETTLE_MS);
+    expect(panel.prefill.mock.calls).toEqual([
+      ["model", "PEARLS"],
+      ["firmware", "1.0.016"],
+    ]);
+    const answers = new FormData();
+    answers.set("model", "PEARLS");
+    answers.set("firmware", "1.0.016");
+
+    const fixture = exportFixture(panel, answers);
+
+    expect(fixture?.header).toMatchObject({ model: "PEARLS", firmware: "1.0.016" });
+    expect(new Set(fixture?.records.map(({ chr }) => chr))).toEqual(new Set([ACAIA_WRITE]));
+    expect(JSON.stringify(panel.show.mock.calls)).not.toContain("SERIAL");
   });
 
   test("an exported fixture records when the session started, before its first write", async () => {

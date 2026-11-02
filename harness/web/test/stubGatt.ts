@@ -90,6 +90,36 @@ export function stubGatt(layout: GattLayout, name = "PEARL S"): StubGatt {
   return { device, server, services, characteristics };
 }
 
+/** Device Information characteristics, as the browser names them. */
+export const DIS = {
+  manufacturer: "00002a29-0000-1000-8000-00805f9b34fb",
+  modelNumber: "00002a24-0000-1000-8000-00805f9b34fb",
+  serialNumber: "00002a25-0000-1000-8000-00805f9b34fb",
+  firmwareRevision: "00002a26-0000-1000-8000-00805f9b34fb",
+  hardwareRevision: "00002a27-0000-1000-8000-00805f9b34fb",
+  softwareRevision: "00002a28-0000-1000-8000-00805f9b34fb",
+} as const;
+
+/** The Device Information service as a Pearl S exposes it: read-only strings, serial included. */
+export const DEVICE_INFORMATION_GATT: GattLayout = [
+  {
+    uuid: "0000180a-0000-1000-8000-00805f9b34fb",
+    characteristics: Object.values(DIS).map((uuid) => ({ uuid, properties: ["read"] })),
+  },
+];
+
+export function characteristicOf(gatt: StubGatt, uuid: string): StubCharacteristic {
+  const found = gatt.characteristics.find((c) => c.uuid === uuid);
+  if (!found) throw new Error(`no stub characteristic ${uuid}`);
+  return found;
+}
+
+/** Makes the characteristic `uuid` read as `text`, UTF-8 encoded like a Device Information string. */
+export function readsAs(gatt: StubGatt, uuid: string, text: string): void {
+  const view = new DataView(new TextEncoder().encode(text).buffer);
+  characteristicOf(gatt, uuid).readValue.mockResolvedValue(view);
+}
+
 /** Every GATT call made on `gatt`, by method name, in the order they were made. */
 export function operationsOn({ server, services, characteristics }: StubGatt): string[] {
   const spies: [string, Mock][] = [

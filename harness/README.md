@@ -40,9 +40,15 @@ or Port forwarding in `chrome://inspect`.
 
 **Connect a scale** opens the browser's chooser, which lists only devices
 whose names match the driver's prefixes (for Acaia: ACAIA, LUNAR, PYXIS,
-PROCH, PEARL, CINCO). The page asks for the driver's services and nothing
-else, so other services on the scale stay invisible to it. Connect a second
-scale the same way.
+PROCH, PEARL, CINCO). The page asks for the driver's services and the
+standard Device Information service (0x180A), nothing else, so other services
+on the scale stay invisible to it. Connect a second scale the same way.
+
+After connecting, the page reads the manufacturer, model number, firmware,
+hardware and software revisions from Device Information, shows them, and fills
+in the export form's model and firmware, which you can still edit. It never
+reads the serial number (0x2A25): a serial identifies one scale, and fixtures
+are public.
 
 ## Recording
 

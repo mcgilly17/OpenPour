@@ -1,9 +1,10 @@
 import type { Driver } from "openpour";
+import { DEVICE_INFORMATION_SERVICE } from "./readDeviceInfo.js";
 
 /**
  * The device chooser's options for `driver`: only devices whose names match its prefixes, and
- * access to its services alone. Never `acceptAllDevices` or empty filters, so the chooser can't
- * offer an unrelated device.
+ * access to its services plus the standard Device Information service, nothing else. Never
+ * `acceptAllDevices` or empty filters, so the chooser can't offer an unrelated device.
  */
 export function buildRequestOptions(driver: Driver): RequestDeviceOptions {
   if (driver.namePrefixes.length === 0) {
@@ -11,7 +12,7 @@ export function buildRequestOptions(driver: Driver): RequestDeviceOptions {
   }
   return {
     filters: driver.namePrefixes.map((namePrefix) => ({ namePrefix })),
-    optionalServices: driver.services,
+    optionalServices: [...driver.services, DEVICE_INFORMATION_SERVICE],
   };
 }
 
