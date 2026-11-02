@@ -1,15 +1,16 @@
 import { addErrorLine, describeErrorLine, type ErrorLine } from "./errorLines.js";
 import { findElement } from "./findElement.js";
 
-export type ConnectionState = "connecting" | "connected" | "disconnected" | "failed";
+export type ConnectionState = "connecting" | "waiting" | "connected" | "disconnected" | "failed";
 export type PanelField = "title" | "connection" | "protocol" | "info" | "capabilities" | "weight";
-export type PanelAction = "tare" | "disconnect" | "reconnect";
+export type PanelAction = "tare" | "disconnect" | "reconnect" | "cancel";
 
 /** A field with nothing to show, so a stale value never reads as live. */
 export const EMPTY_FIELD = "–";
 
 const CONNECTION_TEXT: Record<ConnectionState, string> = {
   connecting: "connecting…",
+  waiting: "waiting for the scale to advertise…",
   connected: "connected",
   disconnected: "disconnected",
   failed: "connect failed",
@@ -55,7 +56,8 @@ export function createScalePanel(container: Element): ScalePanel {
       show("connection", CONNECTION_TEXT[state]);
       button("tare").disabled = state !== "connected";
       button("disconnect").disabled = state !== "connected";
-      button("reconnect").disabled = state === "connected" || state === "connecting";
+      button("reconnect").disabled = state !== "disconnected" && state !== "failed";
+      button("cancel").disabled = state !== "waiting";
     },
     addError: addLine,
     addNote: (text) => addLine(`Note: ${text}`),

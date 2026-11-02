@@ -9,6 +9,7 @@ import { advanceTo, useFakeClock } from "../test/useFakeClock.js";
 import { createScale, RECORDING_REPLACED } from "./createScale.js";
 import { EMPTY_FIELD, type PanelAction, type ScalePanel } from "./createScalePanel.js";
 import { downloadText } from "./downloadText.js";
+import { RECONNECT_RETRY_MS, RECONNECT_WINDOW_MS } from "./retryWhileOutOfRange.js";
 import {
   asDevice,
   BATTERY_ONLY_GATT,
@@ -231,5 +232,74 @@ describe("createScale controls", () => {
     await vi.advanceTimersByTimeAsync(0);
 
     expect(panel.addNote).toHaveBeenCalledExactlyOnceWith(RECORDING_REPLACED);
+  });
+});
+
+describe("createScale waiting for a scale to advertise", () => {
+  const outOfRange = () =>
+    new DOMException("Bluetooth Device is no longer in range.", "NetworkError");
+
+  test("keeps trying while the scale isn't advertising, then connects", async () => {
+    const failures = 3;
+    const gatt = stubGatt(ACAIA_GATT);
+    for (let i = 0; i < failures; i++) gatt.server.connect.mockRejectedValueOnce(outOfRange());
+    const { clock, panel, connected } = connectTo(gatt);
+
+    await advanceTo(clock, failures * RECONNECT_RETRY_MS);
+    await connected;
+
+    expect(gatt.server.connect).toHaveBeenCalledTimes(failures + 1);
+    const waiting = Array.from({ length: failures }, () => ["waiting"]);
+    expect(panel.setConnection.mock.calls).toEqual([["connecting"], ...waiting, ["connected"]]);
+    expect(panel.addError).not.toHaveBeenCalled();
+  });
+
+  test("reports the failure only once the whole window has passed", async () => {
+    const gatt = stubGatt(ACAIA_GATT);
+    gatt.server.connect.mockImplementation(() => Promise.reject(outOfRange()));
+    const { clock, panel, connected } = connectTo(gatt);
+
+    await advanceTo(clock, RECONNECT_WINDOW_MS - 1);
+    expect(panel.setConnection).toHaveBeenLastCalledWith("waiting");
+    await advanceTo(clock, RECONNECT_WINDOW_MS);
+    await connected;
+
+    const attempts = RECONNECT_WINDOW_MS / RECONNECT_RETRY_MS + 1;
+    expect(gatt.server.connect).toHaveBeenCalledTimes(attempts);
+    expect(panel.setConnection).toHaveBeenLastCalledWith("failed");
+    expect(panel.addError).toHaveBeenCalledExactlyOnceWith(
+      expect.stringContaining("no longer in range"),
+    );
+  });
+
+  test("Cancel stops waiting: no more attempts, and no error", async () => {
+    const gatt = stubGatt(ACAIA_GATT);
+    gatt.server.connect.mockImplementation(() => Promise.reject(outOfRange()));
+    const { clock, panel, connected } = connectTo(gatt);
+    await advanceTo(clock, RECONNECT_RETRY_MS / 2);
+
+    click(panel, "cancel");
+    await connected;
+    await advanceTo(clock, 2 * RECONNECT_WINDOW_MS);
+
+    expect(gatt.server.connect).toHaveBeenCalledOnce();
+    expect(panel.setConnection).toHaveBeenLastCalledWith("disconnected");
+    expect(panel.addError).not.toHaveBeenCalled();
+  });
+
+  test("Cancel during an attempt that then succeeds closes that connection unused", async () => {
+    const gatt = stubGatt(ACAIA_GATT);
+    gatt.server.connect
+      .mockRejectedValueOnce(outOfRange())
+      .mockImplementationOnce(() => new Promise((resolve) => setTimeout(resolve, 500)));
+    const { clock, panel, connected } = connectTo(gatt);
+    await advanceTo(clock, RECONNECT_RETRY_MS + 100);
+
+    click(panel, "cancel");
+    await advanceTo(clock, RECONNECT_RETRY_MS + 500);
+    await connected;
+
+    expect(operationsOn(gatt)).toEqual(["connect", "disconnect", ...DISCOVERY, "disconnect"]);
+    expect(panel.setConnection).toHaveBeenLastCalledWith("disconnected");
   });
 });

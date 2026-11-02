@@ -8,6 +8,7 @@ import { downloadText } from "./downloadText.js";
 import { describeError, explainConnectFailure } from "./explainFailure.js";
 import { fixtureDetails } from "./fixtureDetails.js";
 import { type OpenedSession, openSession } from "./openSession.js";
+import { retryWhileOutOfRange } from "./retryWhileOutOfRange.js";
 import { describeCapabilities, describeInfo, showRunnerEvent } from "./showRunnerEvent.js";
 
 export interface ScaleOptions {
@@ -29,7 +30,11 @@ interface Connection {
 }
 
 export interface Scale {
-  /** Connects with a fresh session, runner and recording. Failures are shown, never thrown. */
+  /**
+   * Connects with a fresh session, runner and recording. A scale that isn't advertising yet, such
+   * as one just switched on, is retried until it does, for up to RECONNECT_WINDOW_MS, or until
+   * Cancel. Failures are shown, never thrown.
+   */
   connect(): Promise<void>;
 }
 
@@ -49,6 +54,7 @@ function publicName(driver: Driver, name: string | undefined): string {
 export function createScale(options: ScaleOptions): Scale {
   const { device, label, driver, clock, recordingStartT, panel } = options;
   let connection: Connection | undefined;
+  let cancelWaiting: (() => void) | undefined;
 
   function start({ server, characteristics, session }: OpenedSession): Connection {
     const recorder = createRecorder({ startT: recordingStartT(), label });
@@ -67,18 +73,41 @@ export function createScale(options: ScaleOptions): Scale {
     return { session, runner, recorder };
   }
 
+  /** Opens a session, waiting for a scale that isn't advertising yet, until `signal` aborts. */
+  async function open(signal: AbortSignal): Promise<OpenedSession> {
+    const onWaiting = () => panel.setConnection("waiting");
+    const attempt = () => openSession(device, driver, clock);
+    const opened = await retryWhileOutOfRange(attempt, { clock, signal, onWaiting });
+    if (signal.aborted) {
+      // Cancelled while this last attempt was in flight.
+      opened.server.disconnect();
+      throw signal.reason;
+    }
+    return opened;
+  }
+
+  function showConnectFailure(error: unknown, isCancelled: boolean): void {
+    panel.show("weight", EMPTY_FIELD);
+    if (isCancelled) {
+      panel.setConnection("disconnected");
+      return;
+    }
+    panel.setConnection("failed");
+    panel.addError(explainConnectFailure(error, driver));
+  }
+
   async function connect(): Promise<void> {
+    const cancelling = new AbortController();
+    cancelWaiting = () => cancelling.abort();
     panel.setConnection("connecting");
     panel.show("protocol", EMPTY_FIELD);
     try {
-      const next = start(await openSession(device, driver, clock));
+      const next = start(await open(cancelling.signal));
       if (connection?.recorder.hasPackets()) panel.addNote(RECORDING_REPLACED);
       connection = next;
       panel.setConnection("connected");
     } catch (error) {
-      panel.setConnection("failed");
-      panel.show("weight", EMPTY_FIELD);
-      panel.addError(explainConnectFailure(error, driver));
+      showConnectFailure(error, cancelling.signal.aborted);
     }
   }
 
@@ -100,6 +129,7 @@ export function createScale(options: ScaleOptions): Scale {
   panel.onAction("tare", () => connection?.runner.tare());
   panel.onAction("disconnect", () => void connection?.runner.disconnect());
   panel.onAction("reconnect", () => void connect());
+  panel.onAction("cancel", () => cancelWaiting?.());
   panel.onExport(exportFixture);
   return { connect };
 }
