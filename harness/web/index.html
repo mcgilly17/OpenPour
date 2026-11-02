@@ -31,6 +31,29 @@
     <p id="connect-problem" class="problem" hidden></p>
     <div id="scales"></div>
 
+    <!-- Suggestions only: check IDs from docs/checks.md, plus free text for experiments. -->
+    <datalist id="scenarios">
+      <option value="C1-connect"></option>
+      <option value="C2-keeps-streaming"></option>
+      <option value="C3-zero"></option>
+      <option value="C4-known-weights"></option>
+      <option value="C5-settling"></option>
+      <option value="C6-negative"></option>
+      <option value="C7-app-tare"></option>
+      <option value="C8-scale-tare"></option>
+      <option value="C9-scale-timer"></option>
+      <option value="C10-app-timer"></option>
+      <option value="C11-battery"></option>
+      <option value="C12-units"></option>
+      <option value="C13-steady-pour"></option>
+      <option value="C14-pour-stops"></option>
+      <option value="C15-drop"></option>
+      <option value="C16-reconnect"></option>
+      <option value="C17-two-scales"></option>
+      <option value="C18-identity"></option>
+      <option value="info-frame"></option>
+      <option value="smoke"></option>
+    </datalist>
     <template id="scale-panel">
       <section class="scale">
         <h2 data-field="title">Scale</h2>
@@ -75,7 +98,10 @@
             />
           </label>
           <label>Firmware <input name="firmware" value="unknown" required /></label>
-          <label>Scenario <input name="scenario" required placeholder="e.g. tare-then-pour" /></label>
+          <label
+            >Scenario
+            <input name="scenario" list="scenarios" required placeholder="pick a check or type one"
+          /></label>
           <button type="submit">Export fixture</button>
         </form>
         <h3>Errors and notes</h3>
