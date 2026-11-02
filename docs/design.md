@@ -259,9 +259,15 @@ Lunar (2021 per its owner, firmware 1.0.019 A). These are observations, not veri
   vendor app: auto-off `01` matched "5 minutes" and sound `01` matched "on".
   Changing one setting at a time:
   - max weight 2000 g → 1000 g flipped only the last byte, `01` → `00`;
-  - touch on → off changed only the fifth byte, `00` → `5D`, an odd value for a
-    switch; unconfirmed until touch is turned back on.
-    Auto connect and the other bytes are not yet placed.
+  - sound on → off flipped only the sixth byte, `01` → `00` (predicted
+    beforehand);
+  - the fifth byte is `00` while touch is enabled. Turning touch off locks it
+    for about two minutes, and the byte counts down through the lock: three
+    captures 38.8 s apart read 111, 92 and 67, a steady 1.13 per second (about
+    0.88 s per step, not seconds), and it reads `00` again once touch returns.
+
+  Auto connect and bytes 2, 3 and 7 (`01` each: mode, auto-off and the byte
+  other sources call resolution) are not otherwise tested.
 - **Timer record on the old Lunar:** every weight frame carries `07 00 00 02`,
   which decodes as "stopped at 0.2 s" and never changes while the timer is
   idle. Unverified until the timer is run (check C9).
