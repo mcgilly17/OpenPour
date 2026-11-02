@@ -12,7 +12,6 @@ export function stubPanel(): StubPanel {
     addError: vi.fn<ScalePanel["addError"]>(),
     addNote: vi.fn<ScalePanel["addNote"]>(),
     onAction: vi.fn<ScalePanel["onAction"]>(),
-    prefill: vi.fn<ScalePanel["prefill"]>(),
     onExport: vi.fn<ScalePanel["onExport"]>(),
   };
 }

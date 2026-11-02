@@ -130,21 +130,14 @@ describe("createScale", () => {
     expect(panel.show).toHaveBeenCalledWith("protocol", "handshaking");
   });
 
-  test("Device Information fills the export form and reaches the fixture only through it", async () => {
+  test("Device Information is shown, never fills the export form and never becomes a packet", async () => {
     const { clock, panel, connected } = connectTo(pearlS());
     await connected;
     await advanceTo(clock, SUBSCRIBE_SETTLE_MS);
-    expect(panel.prefill.mock.calls).toEqual([
-      ["model", "PEARLS"],
-      ["firmware", "1.0.016"],
-    ]);
-    const answers = new FormData();
-    answers.set("model", "PEARLS");
-    answers.set("firmware", "1.0.016");
 
-    const fixture = exportFixture(panel, answers);
+    const fixture = exportFixture(panel);
 
-    expect(fixture?.header).toMatchObject({ model: "PEARLS", firmware: "1.0.016" });
+    expect(fixture?.header).toMatchObject({ model: "unknown", firmware: "unknown" });
     expect(new Set(fixture?.records.map(({ chr }) => chr))).toEqual(new Set([ACAIA_WRITE]));
     expect(JSON.stringify(panel.show.mock.calls)).not.toContain("SERIAL");
   });

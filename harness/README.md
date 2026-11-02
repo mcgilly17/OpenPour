@@ -45,8 +45,10 @@ standard Device Information service (0x180A), nothing else, so other services
 on the scale stay invisible to it. Connect a second scale the same way.
 
 After connecting, the page reads the manufacturer, model number, firmware,
-hardware and software revisions from Device Information, shows them, and fills
-in the export form's model and firmware, which you can still edit. It never
+hardware and software revisions from Device Information and shows them under
+"Bluetooth module". On the scales tested so far these describe the radio chip
+(for example a Microchip BM70), not the scale, so they never fill the export
+form: take the scale's model and firmware from its own app. The page never
 reads the serial number (0x2A25): a serial identifies one scale, and fixtures
 are public.
 
