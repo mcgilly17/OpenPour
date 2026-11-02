@@ -237,19 +237,32 @@ Lunar (2021 per its owner, firmware 1.0.019 A). These are observations, not veri
   new-style Acaia, the name filter does more of the device matching than the
   GATT fingerprint.
 - **Device Information (0x180A) describes the module,** not the scale: the
-  Pearl S reports `MCHP`, `BM70`, firmware `009010`. The scale's own model and
-  firmware are not known to be readable yet.
+  Pearl S reports `MCHP`, `BM70`, firmware `009010`; the Lunar reports
+  manufacturer `Enzytek`, hardware `BTA-C1010-2`, firmware `SDK 2.3.0`,
+  software `F-SnowRex-SPS-v009`, and no model number. Neither names the scale.
+- **Neither advertisement names the model reliably.** The Pearl S advertises a
+  `PEARL` name, no service UUIDs, and manufacturer data under company ID
+  `0x4242` holding ASCII `01` (meaning unknown). The Lunar advertises an `ACAIA`
+  name, service `0x1820`, and no manufacturer data.
+- **The Lunar also exposes a Battery service (0x180F),** which read 100% while
+  the settings frame had read 78% an hour earlier; it may be the module's
+  value rather than the scale's.
 - **The 2021 Lunar tested is old style** (`1820`/`2a80`), contradicting the
   "Lunar 2021+ is new style" note above; it decoded on the first attempt.
   Whether "2021" is the model generation or the purchase year is unconfirmed. It splits every frame after `EF DD 0C`; the Pearl S splits at
   arbitrary points.
-- **The type 7 frame carries a version-like triplet, probably the firmware.**
-  It can arrive immediately after subscribing (on some Pearl S connections, not
-  others): length `07`, payload `03 5C 01 00 08 01`. Payload bytes 2–4 read
-  1.0.8, matching the scale's firmware 1.0.008 on two captures (an attempted
-  update to 1.0.009 had not applied). Not yet seen to change with a firmware
-  change. Bytes 0–1 differ between models and are unknown. The session
-  currently treats the frame only as "send identify again".
+- **The type 7 frame is the scale describing itself, and is the only
+  candidate source for its model.** Until identified, both scales repeat it
+  (Pearl S about every 0.5 s, Lunar about every 1.15 s) and stop after about
+  4 s, apparently dropping the connection. Length `07`, then:
+  - Pearl S: `03 5C 01 00 08 01`, the same on three connections;
+  - Lunar: `02 1A 01 00 13 01`, one connection so far.
+
+  Bytes 2–4 match each scale's firmware (1.0.8 and 1.0.19; the attempted
+  Pearl S update to 1.0.009 had not applied). Bytes 0–1 differ between the
+  models and are the best guess for a model code, unconfirmed until each is
+  constant across connections and a third model is seen. Byte 5 is `01` on
+  both. The session currently treats the frame only as "send identify again".
 - **Battery** arrives unrequested about every 20 s on the Pearl S. On the Lunar
   a settings frame byte of `0x4E` decoded as 78%, and the vendor app showed 78%
   at the same time (bit 7 clear; read as "timer not running" by other sources).
