@@ -1,17 +1,18 @@
 import type { Driver } from "openpour";
 import { acaia, NEW_STYLE_HEARTBEAT_MS, SUBSCRIBE_SETTLE_MS } from "openpour/acaia";
-import { bytesToHex, type Fixture, parseFixture } from "openpour/replay";
+import { bytesToHex, type Fixture, hexToBytes, parseFixture } from "openpour/replay";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
-import { ACAIA_COMMAND_VECTORS as TX } from "../../src/test/acaiaVectors.js";
-import { ACAIA_GATT } from "../test/acaiaGatt.js";
+import { ACAIA_VECTORS as RX, ACAIA_COMMAND_VECTORS as TX } from "../../src/test/acaiaVectors.js";
+import { ACAIA_GATT, ACAIA_NOTIFY } from "../test/acaiaGatt.js";
 import { advanceTo, useFakeClock } from "../test/useFakeClock.js";
 import { createScale } from "./createScale.js";
-import type { PanelAction, ScalePanel } from "./createScalePanel.js";
+import { EMPTY_FIELD, type PanelAction, type ScalePanel } from "./createScalePanel.js";
 import { downloadText } from "./downloadText.js";
 import {
   asDevice,
   BATTERY_ONLY_GATT,
+  notify,
   operationsOn,
   type StubGatt,
   stubGatt,
@@ -62,6 +63,10 @@ function exportFixture(panel: StubPanel, answers = new FormData()): Fixture | un
   return jsonl === undefined ? undefined : parseFixture(jsonl);
 }
 
+function weightsShown(panel: StubPanel): string[] {
+  return panel.show.mock.calls.flatMap(([field, text]) => (field === "weight" ? [text] : []));
+}
+
 function writtenHex({ characteristics }: StubGatt): string[] {
   return characteristics.flatMap((c) =>
     // The source writes Uint8Arrays.
@@ -86,6 +91,23 @@ describe("createScale", () => {
     );
     expect(recordingStartT).not.toHaveBeenCalled();
     expect(panel.show).not.toHaveBeenCalledWith("protocol", "handshaking");
+    expect(weightsShown(panel).at(-1)).toBe(EMPTY_FIELD);
+  });
+
+  test("a drop clears the weight, so the last reading never reads as live", async () => {
+    const gatt = stubGatt(ACAIA_GATT);
+    const { clock, panel, connected } = connectTo(gatt);
+    await connected;
+    await advanceTo(clock, SUBSCRIBE_SETTLE_MS);
+    const notifier = gatt.characteristics.find(({ uuid }) => uuid === ACAIA_NOTIFY);
+    if (!notifier) throw new Error("no notify characteristic");
+    notify(notifier, new DataView(hexToBytes(RX.weight).buffer), clock.now());
+    expect(weightsShown(panel).at(-1)).toContain("175.9 g");
+
+    gatt.device.dispatchEvent(new Event("gattserverdisconnected"));
+
+    expect(panel.setConnection).toHaveBeenLastCalledWith("disconnected");
+    expect(weightsShown(panel).at(-1)).toBe(EMPTY_FIELD);
   });
 
   test("a matching scale is only discovered until its session asks to subscribe; writes follow", async () => {

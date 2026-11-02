@@ -2,7 +2,7 @@ import type { Driver, ScaleSession } from "openpour";
 import type { Clock } from "../runner/Clock.js";
 import { createRecorder, type Recorder } from "../runner/createRecorder.js";
 import { type Runner, startRunner } from "../runner/startRunner.js";
-import type { ScalePanel } from "./createScalePanel.js";
+import { EMPTY_FIELD, type ScalePanel } from "./createScalePanel.js";
 import { createWebBluetoothSource } from "./createWebBluetoothSource.js";
 import { downloadText } from "./downloadText.js";
 import { describeError, explainConnectFailure } from "./explainFailure.js";
@@ -57,12 +57,13 @@ export function createScale(options: ScaleOptions): Scale {
 
   async function connect(): Promise<void> {
     panel.setConnection("connecting");
-    panel.show("protocol", "–");
+    panel.show("protocol", EMPTY_FIELD);
     try {
       connection = start(await openSession(device, driver, clock));
       panel.setConnection("connected");
     } catch (error) {
       panel.setConnection("failed");
+      panel.show("weight", EMPTY_FIELD);
       panel.addError(explainConnectFailure(error, driver));
     }
   }

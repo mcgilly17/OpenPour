@@ -29,10 +29,30 @@ export function explainChooseFailure(error: unknown): string {
   return `The device chooser failed: ${describeError(error)}`;
 }
 
+// Chrome's message when the device isn't advertising, e.g. a scale still starting up.
+const OUT_OF_RANGE = /no longer in range/i;
+
+/** Whether connecting failed because the device isn't advertising right now. */
+export function isOutOfRange(error: unknown): boolean {
+  return (
+    error instanceof DOMException &&
+    error.name === "NetworkError" &&
+    OUT_OF_RANGE.test(error.message)
+  );
+}
+
+function asSentence(text: string): string {
+  return text.endsWith(".") ? text : `${text}.`;
+}
+
 export function explainConnectFailure(error: unknown, driver: Driver): string {
   if (isOpenPourError(error) && error.code === "unknown-device") {
     const services = driver.services.join(", ");
     return `Connected, but none of the ${driver.brand} driver's services were found (unknown-device). The page can only see the services it asks for: ${services}. This may be a different scale or an unsupported protocol variant.`;
   }
-  return `Couldn't connect: ${describeError(error)}. Check that the scale is on, awake and nearby, and not connected to another app or tab: it accepts one connection at a time. After a drop, some scales need a few seconds before they accept a new connection.`;
+  const failure = `Couldn't connect: ${asSentence(describeError(error))}`;
+  if (isOutOfRange(error)) {
+    return `${failure} If you just switched the scale on, wait a few seconds and reconnect: it isn't advertising yet. Otherwise wake it and bring it closer.`;
+  }
+  return `${failure} Check that the scale is on, awake and nearby, and not connected to another app or tab: it accepts one connection at a time. After a drop, some scales need a few seconds before they accept a new connection.`;
 }

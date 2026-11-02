@@ -1,6 +1,6 @@
 import type { Capabilities, Reading, ScaleEvent, ScaleInfo } from "openpour";
 import type { RunnerEvent } from "../runner/startRunner.js";
-import type { ScalePanel } from "./createScalePanel.js";
+import { EMPTY_FIELD, type ScalePanel } from "./createScalePanel.js";
 import { describeError } from "./explainFailure.js";
 
 export function describeInfo({ brand, model, firmware }: ScaleInfo): string {
@@ -45,6 +45,7 @@ export function showRunnerEvent(
       break;
     case "disconnected":
       panel.setConnection("disconnected");
+      panel.show("weight", EMPTY_FIELD);
       break;
   }
 }

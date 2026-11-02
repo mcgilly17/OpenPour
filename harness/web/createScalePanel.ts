@@ -1,11 +1,12 @@
+import { addErrorLine, describeErrorLine, type ErrorLine } from "./errorLines.js";
 import { findElement } from "./findElement.js";
 
 export type ConnectionState = "connecting" | "connected" | "disconnected" | "failed";
 export type PanelField = "title" | "connection" | "protocol" | "info" | "capabilities" | "weight";
 export type PanelAction = "tare" | "disconnect" | "reconnect";
 
-/** Past this many errors the oldest go, so a long failing session can't grow the page forever. */
-export const MAX_ERRORS_SHOWN = 50;
+/** A field with nothing to show, so a stale value never reads as live. */
+export const EMPTY_FIELD = "–";
 
 const CONNECTION_TEXT: Record<ConnectionState, string> = {
   connecting: "connecting…",
@@ -33,6 +34,7 @@ export function createScalePanel(container: Element): ScalePanel {
   const button = (action: PanelAction) =>
     findElement(root, `[data-action="${action}"]`, HTMLButtonElement);
   const form = findElement(root, "form", HTMLFormElement);
+  const errorLines: ErrorLine[] = [];
 
   function show(name: PanelField, text: string): void {
     field(name).textContent = text;
@@ -47,9 +49,10 @@ export function createScalePanel(container: Element): ScalePanel {
       button("reconnect").disabled = state === "connected" || state === "connecting";
     },
     addError(text) {
-      const errors = field("errors");
-      errors.append(Object.assign(document.createElement("li"), { textContent: text }));
-      if (errors.children.length > MAX_ERRORS_SHOWN) errors.firstElementChild?.remove();
+      addErrorLine(errorLines, text);
+      const item = (line: ErrorLine) =>
+        Object.assign(document.createElement("li"), { textContent: describeErrorLine(line) });
+      field("errors").replaceChildren(...errorLines.map(item));
     },
     onAction(action, handler) {
       button(action).addEventListener("click", handler);
