@@ -5,6 +5,7 @@ import { ACAIA_VECTORS as RX, ACAIA_COMMAND_VECTORS as TX } from "../../src/test
 import { ACAIA_GATT, ACAIA_WRITE } from "../test/acaiaGatt.js";
 import { advanceTo } from "../test/useFakeClock.js";
 import { EMPTY_FIELD } from "./createScalePanel.js";
+import { downloadText } from "./downloadText.js";
 import { RECONNECT_RETRY_MS, RECONNECT_WINDOW_MS } from "./retryWhileOutOfRange.js";
 import {
   click,
@@ -115,6 +116,29 @@ describe("createScale and device identifiers", () => {
 
     expect(panel.show).toHaveBeenCalledWith("title", "Scale a: Acaia PEARL");
     expect(JSON.stringify(panel.show.mock.calls)).not.toContain("D9F8BC");
+  });
+
+  test("the browser's device ID never reaches an export, its file name, the log or the card", async () => {
+    // Shaped like Chrome's IDs, without a hex run the identifier check would catch anyway.
+    const deviceId = "Xq7Lm+Pz2wRk/5Ny0Ab==";
+    const gatt = stubGatt(ACAIA_GATT);
+    Object.assign(gatt.device, { id: deviceId });
+    const { clock, panel, connected } = connectTo(gatt);
+    await connected;
+    await advanceTo(clock, SUBSCRIBE_SETTLE_MS);
+    notifyHex(gatt, RX.weight, clock.now());
+    const answers = new FormData();
+    answers.set("model", "AL008");
+    answers.set("modelYear", "2021");
+    answers.set("scenario", "smoke");
+
+    const fixture = exportFixture(panel, 1, answers);
+
+    expect(fixture?.header).toMatchObject({ model: "AL008", modelYear: 2021 });
+    const [fileName, jsonl] = vi.mocked(downloadText).mock.calls[0] ?? [];
+    expect(`${fileName}\n${jsonl}`).not.toContain(deviceId);
+    const shownOnCard = [panel.log.mock.calls, panel.show.mock.calls, panel.addNote.mock.calls];
+    expect(JSON.stringify(shownOnCard)).not.toContain(deviceId);
   });
 
   test.each(["model", "firmware", "scenario"])(
