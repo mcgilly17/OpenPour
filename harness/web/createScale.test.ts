@@ -277,6 +277,13 @@ describe("createScale runs one connection at a time", () => {
     expect(recordingStartT).toHaveBeenCalledOnce();
     expect(writtenHex(gatt).length - writesAlone - writesPerInterval).toBe(writesPerInterval);
     expect(vi.getTimerCount()).toBe(timers);
+    expect(panel.setControls).toHaveBeenLastCalledWith({
+      disconnect: true,
+      reconnect: false,
+      listen: false,
+      startSession: false,
+      cancel: false,
+    });
   });
 
   test("Reconnect while an attempt waits for the scale starts no second attempt", async () => {
@@ -285,7 +292,9 @@ describe("createScale runs one connection at a time", () => {
     const driver = { ...acaia, createSession: vi.fn(acaia.createSession) };
     const { clock, panel, connected } = connectTo(gatt, { driver });
     await advanceTo(clock, RECONNECT_RETRY_MS / 2);
-    expect(panel.setConnection).toHaveBeenLastCalledWith("waiting");
+    expect(panel.setControls).toHaveBeenLastCalledWith(
+      expect.objectContaining({ reconnect: false, cancel: true }),
+    );
 
     click(panel, "reconnect");
     await advanceTo(clock, RECONNECT_RETRY_MS + SUBSCRIBE_SETTLE_MS);

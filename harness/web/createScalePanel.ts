@@ -1,12 +1,10 @@
 import {
   type CommandAvailability,
-  KNOWN_COMMANDS,
+  commandAvailability,
   type KnownCommand,
 } from "./commandAvailability.js";
-import { createCompareView, type FindEarlier } from "./createCompareView.js";
-import { createLogView } from "./createLogView.js";
-import { addErrorLine, describeErrorLine, type ErrorLine } from "./errorLines.js";
-import { findElement } from "./findElement.js";
+import type { PacketRun } from "./comparePackets.js";
+import { addErrorLine, type ErrorLine } from "./errorLines.js";
 import type { LogEntry } from "./LogEntry.js";
 import type { DeviceInfoField } from "./readDeviceInfo.js";
 
@@ -19,7 +17,6 @@ export type ConnectionState =
   | "failed";
 export type PanelField =
   | "title"
-  | "connection"
   | "protocol"
   | "info"
   | "capabilities"
@@ -27,13 +24,10 @@ export type PanelField =
   | "timer"
   | "battery"
   | DeviceInfoField;
-export type PanelAction =
-  | "disconnect"
-  | "reconnect"
-  | "listen"
-  | "startSession"
-  | "cancel"
-  | KnownCommand;
+export type ConnectionAction = "disconnect" | "reconnect" | "listen" | "startSession" | "cancel";
+export type PanelAction = ConnectionAction | KnownCommand;
+/** Whether each connection button works now. */
+export type ConnectionControls = Record<ConnectionAction, boolean>;
 
 /** One kept recording as its row in the panel's list. */
 export interface RecordingSummary {
@@ -45,19 +39,21 @@ export interface RecordingSummary {
 /** A field with nothing to show, so a stale value never reads as live. */
 export const EMPTY_FIELD = "–";
 
-const CONNECTION_TEXT: Record<ConnectionState, string> = {
-  connecting: "connecting…",
-  waiting: "waiting for the scale to advertise…",
-  listening: "listening only: nothing is sent",
-  connected: "connected",
-  disconnected: "disconnected",
-  failed: "connect failed",
-};
+/** Rows the log keeps on screen; older ones scroll away, but recordings keep every packet. */
+export const LOG_ROWS_SHOWN = 300;
 
-/** One scale's part of the page. */
+/** Starts a note's line: notes share the errors list, so a line says which it is. */
+export const NOTE_PREFIX = "Note: ";
+
+/** Earlier runs, from the scale's kept recordings, whose bytes start like `run`'s. */
+export type FindEarlier = (run: PacketRun, prefixBytes: number) => PacketRun[];
+
+/** One scale's part of the page, as its scale drives it. */
 export interface ScalePanel {
   show(field: PanelField, text: string): void;
   setConnection(state: ConnectionState): void;
+  /** Enables or disables each connection button, as the scale's own state allows. */
+  setControls(controls: ConnectionControls): void;
   /** Enables each driver command, or disables it and shows why. */
   setCommands(availability: CommandAvailability): void;
   showRecordings(recordings: readonly RecordingSummary[]): void;
@@ -73,99 +69,106 @@ export interface ScalePanel {
   onFindEarlier(handler: FindEarlier): void;
 }
 
-function recordingItem({ id, text, canDiscard }: RecordingSummary): HTMLLIElement {
-  const item = document.createElement("li");
-  const exportButton = Object.assign(document.createElement("button"), {
-    type: "submit",
-    name: "recording",
-    value: String(id),
-    textContent: "Export",
-  });
-  const discard = Object.assign(document.createElement("button"), {
-    type: "button",
-    textContent: "Discard",
-    disabled: !canDiscard,
-  });
-  discard.dataset.discard = String(id);
-  item.append(`${text} `, exportButton, " ", discard);
-  return item;
+/** A log entry with a key that stays the same as older rows drop off. */
+export interface LogRow {
+  id: number;
+  entry: LogEntry;
 }
 
-/** Adds a panel, from the page's `#scale-panel` template, to `container`. */
-export function createScalePanel(container: Element): ScalePanel {
-  const template = findElement(document, "#scale-panel", HTMLTemplateElement);
-  const root = findElement(document.importNode(template.content, true), "section", HTMLElement);
-  container.append(root);
-  const field = (name: string) => findElement(root, `[data-field="${name}"]`, HTMLElement);
-  const button = (action: PanelAction) =>
-    findElement(root, `[data-action="${action}"]`, HTMLButtonElement);
-  const form = findElement(root, "form", HTMLFormElement);
-  const logView = createLogView(findElement(root, '[data-part="log"]', HTMLElement));
-  const compareView = createCompareView(findElement(root, '[data-part="compare"]', HTMLElement));
-  logView.onMark((slot, run) => compareView.mark(slot, run));
-  compareView.onMarksChanged((marks) => logView.showMarks(marks));
-  const errorLines: ErrorLine[] = [];
+/** Everything the panel shows. Every change replaces it, so the page re-renders what changed. */
+export interface PanelState {
+  /** Shown fields; one never shown yet is EMPTY_FIELD. */
+  fields: Readonly<Partial<Record<PanelField, string>>>;
+  connection: ConnectionState | undefined;
+  controls: ConnectionControls;
+  commands: CommandAvailability;
+  recordings: readonly RecordingSummary[];
+  log: readonly LogRow[];
+  errors: readonly ErrorLine[];
+}
 
-  function show(name: PanelField, text: string): void {
-    field(name).textContent = text;
+/**
+ * The panel as a store: the scale writes to it through ScalePanel, the page renders its snapshot
+ * (with useSyncExternalStore) and passes clicks back through the rest.
+ */
+export interface ScalePanelStore extends ScalePanel {
+  subscribe(listener: () => void): () => void;
+  getSnapshot(): PanelState;
+  act(action: PanelAction): void;
+  exportFixture(answers: FormData): void;
+  discard(recording: number): void;
+  findEarlier: FindEarlier;
+}
+
+export function createScalePanel(): ScalePanelStore {
+  let state: PanelState = {
+    fields: {},
+    connection: undefined,
+    controls: {
+      disconnect: false,
+      reconnect: false,
+      listen: false,
+      startSession: false,
+      cancel: false,
+    },
+    commands: commandAvailability(undefined, false),
+    recordings: [],
+    log: [],
+    errors: [],
+  };
+  let nextRowId = 0;
+  const listeners = new Set<() => void>();
+  const actions = new Map<PanelAction, () => void>();
+  let onExport: (answers: FormData) => void = () => {};
+  let onDiscard: (recording: number) => void = () => {};
+  let onFindEarlier: FindEarlier = () => [];
+
+  function update(change: Partial<PanelState>): void {
+    state = { ...state, ...change };
+    for (const listener of listeners) listener();
   }
 
   function addLine(text: string): void {
-    addErrorLine(errorLines, text);
-    const item = (line: ErrorLine) =>
-      Object.assign(document.createElement("li"), { textContent: describeErrorLine(line) });
-    field("errors").replaceChildren(...errorLines.map(item));
-  }
-
-  function setCommands(availability: CommandAvailability): void {
-    const byReason = new Map<string, string[]>();
-    for (const command of KNOWN_COMMANDS) {
-      const reason = availability[command];
-      const commandButton = button(command);
-      commandButton.disabled = reason !== undefined;
-      commandButton.title = reason ?? "";
-      if (reason)
-        byReason.set(reason, [...(byReason.get(reason) ?? []), commandButton.textContent]);
-    }
-    const lines = [...byReason].map(([reason, labels]) => `${labels.join(", ")}: ${reason}.`);
-    field("commands").textContent = lines.join(" ");
+    // addErrorLine counts a repeat into the last line in place, so it gets copies.
+    const errors = state.errors.map((line) => ({ ...line }));
+    addErrorLine(errors, text);
+    update({ errors });
   }
 
   return {
-    show,
-    setConnection(state) {
-      show("connection", CONNECTION_TEXT[state]);
-      const isOpen = state === "connected" || state === "listening";
-      const isClosed = state === "disconnected" || state === "failed";
-      button("disconnect").disabled = !isOpen;
-      button("reconnect").disabled = !isClosed;
-      button("listen").disabled = !isClosed;
-      button("startSession").disabled = state !== "listening";
-      button("cancel").disabled = state !== "waiting";
-      field("listen-warning").hidden = state !== "listening";
+    show: (field, text) => update({ fields: { ...state.fields, [field]: text } }),
+    setConnection: (connection) => update({ connection }),
+    setControls: (controls) => update({ controls }),
+    setCommands: (commands) => update({ commands }),
+    showRecordings: (recordings) => update({ recordings }),
+    log(entry) {
+      const row = { id: nextRowId++, entry };
+      update({ log: [...state.log, row].slice(-LOG_ROWS_SHOWN) });
     },
-    setCommands,
-    showRecordings(recordings) {
-      field("recordings").replaceChildren(...recordings.map(recordingItem));
-    },
-    log: (entry) => logView.add(entry),
     addError: addLine,
-    addNote: (text) => addLine(`Note: ${text}`),
+    addNote: (text) => addLine(`${NOTE_PREFIX}${text}`),
     onAction(action, handler) {
-      button(action).addEventListener("click", handler);
+      actions.set(action, handler);
     },
     onExport(handler) {
-      form.addEventListener("submit", (event) => {
-        event.preventDefault();
-        handler(new FormData(form, event.submitter));
-      });
+      onExport = handler;
     },
     onDiscard(handler) {
-      field("recordings").addEventListener("click", ({ target }) => {
-        const id = target instanceof HTMLElement ? target.dataset.discard : undefined;
-        if (id && confirm(`Discard recording #${id}? It can't be recovered.`)) handler(Number(id));
-      });
+      onDiscard = handler;
     },
-    onFindEarlier: (handler) => compareView.onFindEarlier(handler),
+    onFindEarlier(handler) {
+      onFindEarlier = handler;
+    },
+    subscribe(listener) {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+    getSnapshot: () => state,
+    act: (action) => actions.get(action)?.(),
+    exportFixture: (answers) => onExport(answers),
+    discard: (recording) => onDiscard(recording),
+    findEarlier: (run, prefixBytes) => onFindEarlier(run, prefixBytes),
   };
 }

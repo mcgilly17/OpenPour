@@ -9,6 +9,7 @@ export function stubPanel(): StubPanel {
   return {
     show: vi.fn<ScalePanel["show"]>(),
     setConnection: vi.fn<ScalePanel["setConnection"]>(),
+    setControls: vi.fn<ScalePanel["setControls"]>(),
     setCommands: vi.fn<ScalePanel["setCommands"]>(),
     showRecordings: vi.fn<ScalePanel["showRecordings"]>(),
     log: vi.fn<ScalePanel["log"]>(),

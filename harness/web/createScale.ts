@@ -10,7 +10,12 @@ import {
   type Recording,
   type RecordingKind,
 } from "./createRecordings.js";
-import { EMPTY_FIELD, type ScalePanel } from "./createScalePanel.js";
+import {
+  type ConnectionControls,
+  type ConnectionState,
+  EMPTY_FIELD,
+  type ScalePanel,
+} from "./createScalePanel.js";
 import { createWebBluetoothSource } from "./createWebBluetoothSource.js";
 import { downloadText } from "./downloadText.js";
 import { describeError, explainConnectFailure } from "./explainFailure.js";
@@ -100,6 +105,23 @@ export function createScale(options: ScaleOptions): Scale {
     return conn !== undefined && !conn.isClosed;
   }
 
+  /** Which connection buttons work now, from the same state connect and startSession check. */
+  function controls(): ConnectionControls {
+    const canOpen = attempt === undefined && !isOpen(connection);
+    return {
+      disconnect: isOpen(connection),
+      reconnect: canOpen,
+      listen: canOpen,
+      startSession: isOpen(connection) && connection.runner === undefined,
+      cancel: attempt?.isWaiting === true,
+    };
+  }
+
+  function showConnection(state: ConnectionState): void {
+    panel.setConnection(state);
+    panel.setControls(controls());
+  }
+
   function availability() {
     const isRunning = connection?.runner !== undefined && !connection.isClosed;
     return commandAvailability(connection?.opened.session.capabilities, isRunning);
@@ -125,6 +147,7 @@ export function createScale(options: ScaleOptions): Scale {
     conn.recording.isLive = false;
     mark(conn.recording, t, "disconnected");
     showRunnerEvent(panel, { type: "disconnected", t });
+    panel.setControls(controls());
     showRecordings();
     panel.setCommands(availability());
   }
@@ -158,7 +181,7 @@ export function createScale(options: ScaleOptions): Scale {
       clock,
       onEvent: (event) => onRunnerEvent(conn, recording, event),
     });
-    panel.setConnection("connected");
+    showConnection("connected");
     panel.setCommands(availability());
   }
 
@@ -199,7 +222,7 @@ export function createScale(options: ScaleOptions): Scale {
   function listen(conn: Connection): void {
     const t = clock.now();
     const targets = listenTargets(conn, t);
-    panel.setConnection("listening");
+    showConnection("listening");
     panel.show("protocol", "not started (listen-only)");
     panel.setCommands(availability());
     mark(conn.recording, t, `#${conn.recording.id} listen-only: subscribing, sending nothing`);
@@ -230,7 +253,7 @@ export function createScale(options: ScaleOptions): Scale {
   async function open(signal: AbortSignal, current: Attempt): Promise<OpenedSession> {
     const onWaiting = () => {
       current.isWaiting = true;
-      panel.setConnection("waiting");
+      showConnection("waiting");
     };
     const attempt = () => openSession(device, driver, clock);
     const opened = await retryWhileOutOfRange(attempt, { clock, signal, onWaiting });
@@ -245,10 +268,10 @@ export function createScale(options: ScaleOptions): Scale {
   function showConnectFailure(error: unknown, isCancelled: boolean): void {
     panel.show("weight", EMPTY_FIELD);
     if (isCancelled) {
-      panel.setConnection("disconnected");
+      showConnection("disconnected");
       return;
     }
-    panel.setConnection("failed");
+    showConnection("failed");
     panel.addError(explainConnectFailure(error, driver));
   }
 
@@ -259,7 +282,7 @@ export function createScale(options: ScaleOptions): Scale {
     const cancelling = new AbortController();
     const current: Attempt = { cancel: () => cancelling.abort(), isWaiting: false };
     attempt = current;
-    panel.setConnection("connecting");
+    showConnection("connecting");
     panel.show("protocol", EMPTY_FIELD);
     try {
       const opened = await open(cancelling.signal, current);
@@ -306,6 +329,7 @@ export function createScale(options: ScaleOptions): Scale {
 
   panel.show("title", `Scale ${label}: ${publicName(driver, device.name)}`);
   panel.setCommands(availability());
+  panel.setControls(controls());
   for (const command of KNOWN_COMMANDS) panel.onAction(command, () => send(command));
   panel.onAction("disconnect", disconnect);
   panel.onAction("reconnect", () => void connect("session"));
