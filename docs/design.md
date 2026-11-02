@@ -267,6 +267,14 @@ Lunar (2021 per its owner, firmware 1.0.019 A). These are observations, not veri
 
   Auto connect and bytes 2, 3 and 7 (`01` each: mode, auto-off and the byte
   other sources call resolution) are not otherwise tested.
+- **Units follow the display, so ounces arrive as ounces.** The same object
+  settled at `116.4` (units byte `02`, 1 decimal) in grams and `4.106` (units
+  byte `05`, 3 decimals) in ounces on the Lunar; 4.106 oz is 116.40 g. A driver
+  that ignores the units byte reports ounces as grams. Whether a units change
+  made on the scale mid-session sends a new settings frame is untested.
+- **Weight byte 5, bit 0 marks an unsettled reading** on the Lunar: set on every
+  reading while the load was changing, clear on every reading at rest and once
+  settled.
 - **Timer record on the old Lunar:** every weight frame carries `07 00 00 02`,
   which decodes as "stopped at 0.2 s" and never changes while the timer is
   idle. Unverified until the timer is run (check C9).
