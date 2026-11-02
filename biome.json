@@ -20,6 +20,9 @@
         "noDefaultExport": "error",
         "noEnum": "error"
       }
+    },
+    "domains": {
+      "react": "none"
     }
   },
   "overrides": [
@@ -74,6 +77,44 @@
           }
         }
       }
+    },
+    {
+      "includes": ["harness/web/**", "!harness/web/**/*.test.ts", "!harness/web/test/**"],
+      "linter": {
+        "domains": {
+          "react": "recommended"
+        }
+      }
+    },
+    {
+      "includes": ["harness/runner/**", "!harness/runner/**/*.test.ts"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "paths": {},
+                "patterns": [
+                  {
+                    "group": ["**/src/**"],
+                    "message": "The harness uses OpenPour like any consumer: import openpour, openpour/acaia or openpour/replay."
+                  },
+                  {
+                    "group": ["react", "react-dom", "react/*", "react-dom/*"],
+                    "message": "The runner is shared with the Node harness, so it stays free of React and the DOM."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
     }
-  ]
+  ],
+  "css": {
+    "parser": {
+      "tailwindDirectives": true
+    }
+  }
 }

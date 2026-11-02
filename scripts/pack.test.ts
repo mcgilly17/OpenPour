@@ -2,8 +2,9 @@ import { execSync } from "node:child_process";
 import { expect, test } from "vitest";
 import manifest from "../package.json" with { type: "json" };
 
-// The harness and what it alone needs (Vite, Bluetooth libraries and their types) are dev-only.
-const DEV_ONLY_PACKAGE = /vite|bluetooth|noble|\bble\b/i;
+// The harness and what it alone needs (Vite, Bluetooth libraries, the page's React, Tailwind and
+// Radix, and their types) are dev-only.
+const DEV_ONLY_PACKAGE = /vite|bluetooth|noble|\bble\b|react|tailwind|radix|lucide|jsdom/i;
 const RUNTIME_FIELDS = ["dependencies", "peerDependencies", "optionalDependencies"];
 
 interface PackResult {
