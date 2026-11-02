@@ -31,29 +31,6 @@
     <p id="connect-problem" class="problem" hidden></p>
     <div id="scales"></div>
 
-    <!-- Suggestions only: check IDs from docs/checks.md, plus free text for experiments. -->
-    <datalist id="scenarios">
-      <option value="C1-connect"></option>
-      <option value="C2-keeps-streaming"></option>
-      <option value="C3-zero"></option>
-      <option value="C4-known-weights"></option>
-      <option value="C5-settling"></option>
-      <option value="C6-negative"></option>
-      <option value="C7-app-tare"></option>
-      <option value="C8-scale-tare"></option>
-      <option value="C9-scale-timer"></option>
-      <option value="C10-app-timer"></option>
-      <option value="C11-battery"></option>
-      <option value="C12-units"></option>
-      <option value="C13-steady-pour"></option>
-      <option value="C14-pour-stops"></option>
-      <option value="C15-drop"></option>
-      <option value="C16-reconnect"></option>
-      <option value="C17-two-scales"></option>
-      <option value="C18-identity"></option>
-      <option value="info-frame"></option>
-      <option value="smoke"></option>
-    </datalist>
     <template id="scale-panel">
       <section class="scale">
         <h2 data-field="title">Scale</h2>
@@ -100,7 +77,34 @@
           <label>Firmware <input name="firmware" value="unknown" required /></label>
           <label
             >Scenario
-            <input name="scenario" list="scenarios" required placeholder="pick a check or type one"
+            <select name="scenario" required>
+              <option value="">choose…</option>
+              <option>C1-connect</option>
+              <option>C2-keeps-streaming</option>
+              <option>C3-zero</option>
+              <option>C4-known-weights</option>
+              <option>C5-settling</option>
+              <option>C6-negative</option>
+              <option>C7-app-tare</option>
+              <option>C8-scale-tare</option>
+              <option>C9-scale-timer</option>
+              <option>C10-app-timer</option>
+              <option>C11-battery</option>
+              <option>C12-units</option>
+              <option>C13-steady-pour</option>
+              <option>C14-pour-stops</option>
+              <option>C15-drop</option>
+              <option>C16-reconnect</option>
+              <option>C17-two-scales</option>
+              <option>C18-identity</option>
+              <option>mode</option>
+              <option>settings-change</option>
+              <option>info-frame</option>
+              <option>smoke</option>
+            </select></label
+          >
+          <label
+            >Detail <input name="scenarioDetail" placeholder="optional, e.g. oz or auto-tare"
           /></label>
           <button type="submit">Export fixture</button>
         </form>

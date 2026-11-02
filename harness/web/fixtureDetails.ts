@@ -23,6 +23,17 @@ export function identifierProblem(name: string, value: string): string | undefin
   return `${name} "${value}" contains ${run}, which looks like a device identifier (6 or more hex digits in a row). Fixtures are public: remove it before exporting.`;
 }
 
+/** The chosen scenario, with the optional free-text detail appended, e.g. "C12-units-oz". */
+export function scenarioOf(answers: FormData): string {
+  const text = (name: string): string => {
+    const value = answers.get(name);
+    return typeof value === "string" ? value.trim() : "";
+  };
+  const scenario = text("scenario") || "unknown";
+  const detail = text("scenarioDetail");
+  return detail === "" ? scenario : `${scenario}-${detail}`;
+}
+
 /**
  * The export form's answers as fixture header details. Blank answers count as "unknown". Throws
  * when an answer looks like it contains a device identifier.
@@ -32,18 +43,23 @@ export function fixtureDetails(answers: FormData, brand: string): FixtureDetails
     const value = answers.get(name);
     return typeof value === "string" && value.trim() !== "" ? value.trim() : "unknown";
   };
+  const values = {
+    model: answer("model"),
+    firmware: answer("firmware"),
+    scenario: scenarioOf(answers),
+  };
   for (const name of FREE_TEXT_ANSWERS) {
-    const problem = identifierProblem(name, answer(name));
+    const problem = identifierProblem(name, values[name]);
     if (problem) throw new Error(problem);
   }
   const modelYear = answer("modelYear");
   return {
     brand,
-    model: answer("model"),
+    model: values.model,
     ...(YEAR.test(modelYear) ? { modelYear: Number(modelYear) } : {}),
-    firmware: answer("firmware"),
+    firmware: values.firmware,
     captured: new Date().toISOString().slice(0, 10),
     tool: HARNESS_TOOL,
-    scenario: answer("scenario"),
+    scenario: values.scenario,
   };
 }
