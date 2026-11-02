@@ -191,6 +191,38 @@ To see what a scale sends before any session reacts, such as a frame that
 arrives right after subscribing, use **Connect listen-only**, wait a moment,
 then **Start session** before the scale gives up.
 
+### Settings sweep
+
+Each card's **Settings sweep** does the bookkeeping of the steps above for a
+whole run of changes:
+
+1. Mark the frame as **A** (shift-click its last row if it's split), choose how
+   many of its first bytes to match (3, as for **Find**), and **Track this
+   frame**. The sweep keeps those bytes, the frame's length and its
+   characteristic.
+2. Ask for the frame, type `baseline` as the **Setting** and **Capture**.
+   Capture takes the newest frame in the scale's latest recording that starts
+   with the tracked bytes, however the scale split it, and exports that
+   recording as its evidence: scenario `settings-change`, the setting and value
+   as the detail (`sound` and `off` give `settings-change-sound-off`), and
+   model, model year and firmware from the saved scale, else from the export
+   form. With no matching frame in the recording yet, or an answer that looks
+   like a device identifier, it says so and adds no row.
+3. Change one setting in the vendor app, **Reconnect**, ask for the frame
+   again, and capture with the setting and its new value. The row lists every
+   byte that differs from the baseline, with both values; `--` marks a byte
+   only one of the frames has.
+4. **Export sweep** downloads `<model>_fw<firmware>_settings-sweep.json`: the
+   card's brand and name prefix (such as "Acaia PEARL"), model, model year,
+   firmware, the tracked bytes and the export time, then each row's setting,
+   value, frame, fixture file name and changed bytes. It never holds the
+   device ID, the nickname or Device Information.
+
+The baseline is the row whose setting is `baseline`, else the first. **Remove**
+drops a row, and **A** marks its frame for **Compare packets**. The sweep
+stays with its card across reconnects, like the recordings, and like them is
+lost when the page reloads.
+
 ## The page's code
 
 The page is React, styled with Tailwind CSS and built from
@@ -204,9 +236,9 @@ Tailwind plugins; there is no Vite config file.
   DOM, so its tests drive it with a stub panel and no browser.
 - `ScaleCard` renders a panel's state with `useSyncExternalStore` and passes
   clicks back to it. Each part of the card (`Readouts`, `CommandBar`,
-  `RecordingsSection`, `LogTable`, `ComparePanel`) is its own component; a new
-  part, such as a GATT browser, a check list or a weight plot, is another
-  section in `ScaleCard`.
+  `RecordingsSection`, `LogTable`, `ComparePanel`, `SweepSection`) is its own
+  component; a new part, such as a GATT browser, a check list or a weight
+  plot, is another section in `ScaleCard`.
 - `savedScales` reads and writes saved scales over any Storage-like object;
   `rememberedDevice` and `waitForAdvertisement` find and wake a saved scale
   for `useScales` to connect like a chosen one.
