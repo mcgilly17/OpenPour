@@ -323,6 +323,19 @@ Lunar (2021 per its owner, firmware 1.0.019 A). These are observations, not veri
 - **Timer record on the old Lunar:** every weight frame carries `07 00 00 02`,
   which decodes as "stopped at 0.2 s" and never changes while the timer is
   idle. Unverified until the timer is run (check C9).
+- **Lunar buttons and timer** (one recording, tests run back to back): a
+  button press arrives as a tag `08` record inside a weight message, `08`
+  then a code. Timer start on the scale's button sent code `08` (with a weight
+  record), stop `0A` (alone) and reset `09` (with weight and timer records).
+  Tare on the scale's button sent no event: the weight just dropped to 0. The
+  harness's tare and timer commands drew no event and no acknowledgement.
+  While running, the timer record reads seconds and tenths (`07 00 SS T`) on
+  every weight message, about 0.22 s apart, with no offset from the start
+  command. Powering off (a double tap of the timer button) sent code `08`,
+  then an unseen message type `20` with payload `0E 0E 00`, then dropped the
+  connection; `20` is perhaps a shutdown notice. A long press of tare did
+  something not yet identified, and its readings of about 116 g had the bit
+  decoded as negative set.
 - **Connections:** a scale drops a connection that sends no heartbeat within a
   few seconds, and needs a few seconds after power-on before it accepts one.
 
