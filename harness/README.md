@@ -161,7 +161,8 @@ so while listening.
 ## Investigating a protocol
 
 To find the bytes that carry a setting, change one setting at a time and
-compare the frames:
+compare the frames. [Investigate a setting](#investigate-a-setting) does this
+for you; by hand:
 
 1. Connect and wait for the frame you're after. For example, on an Acaia
    scale **Request battery** asks for the settings frame. Then **Pause
@@ -191,36 +192,45 @@ To see what a scale sends before any session reacts, such as a frame that
 arrives right after subscribing, use **Connect listen-only**, wait a moment,
 then **Start session** before the scale gives up.
 
-### Settings sweep
+### Investigate a setting
 
-Each card's **Settings sweep** does the bookkeeping of the steps above for a
-whole run of changes:
+**Investigate a setting**, on a connected scale's card, runs those steps for
+one setting with nothing to pick in the log:
 
-1. Mark the frame as **A** (shift-click its last row if it's split), choose how
-   many of its first bytes to match (3, as for **Find**), and **Track this
-   frame**. The sweep keeps those bytes, the frame's length and its
-   characteristic.
-2. Ask for the frame, type `baseline` as the **Setting** and **Capture**.
-   Capture takes the newest frame in the scale's latest recording that starts
-   with the tracked bytes, however the scale split it, and exports that
-   recording as its evidence: scenario `settings-change`, the setting and value
-   as the detail (`sound` and `off` give `settings-change-sound-off`), and
-   model, model year and firmware from the saved scale, else from the export
-   form. With no matching frame in the recording yet, or an answer that looks
-   like a device identifier, it says so and adds no row.
-3. Change one setting in the vendor app, **Reconnect**, ask for the frame
-   again, and capture with the setting and its new value. The row lists every
-   byte that differs from the baseline, with both values; `--` marks a byte
-   only one of the frames has.
-4. **Export sweep** downloads `<model>_fw<firmware>_settings-sweep.json`: the
-   card's brand and name prefix (such as "Acaia PEARL"), model, model year,
-   firmware, the tracked bytes and the export time, then each row's setting,
-   value, frame, fixture file name and changed bytes. It never holds the
-   device ID, the nickname or Device Information.
+1. Name the setting (`Sound`), list its options separated by commas
+   (`on, off`), and choose what to **Ask the scale with**: one of the driver's
+   commands, or nothing. On an Acaia scale, **Request battery** also brings the
+   settings frame. The browser remembers the choice for each scale name, such
+   as Acaia PEARL.
+2. **Start** disconnects the scale. There is a step for each option, then one
+   for the first option again: that repeat tells the setting's bytes from ones
+   that drift, like battery, and puts the setting back.
+3. Set the option the step names in the vendor app, close the app, and press
+   **Done, read the scale**. The page reconnects as **Reconnect** does, waits
+   for the session to be ready, sends the chosen command, records for 2 s
+   (`WIZARD_SETTLE_MS`), exports the recording as scenario `settings-change`
+   with `<setting>-<option>` as the detail (`-again` added on the repeat), and
+   disconnects. Model, model year
+   and firmware come from the saved scale, else the export form. "Scale not
+   found" usually means the vendor app still holds the scale: close it and
+   **Retry**.
+4. The **Result** joins each recording's notifications into frames, starting
+   one at each 2-byte sync that most notifications start with, and groups them
+   by their first 3 bytes. Bytes that changed within one recording, such as
+   the weight, don't count. It lists the bytes that follow the setting first,
+   then bytes that changed but weren't back on the repeat, and kinds of frame
+   some step never saw:
 
-The baseline is the row whose setting is `baseline`, else the first. **Remove**
-drops a row, and **A** marks its frame for **Compare packets**. The sweep
-stays with its card across reconnects, like the recordings, and like them is
+   ```text
+   Frame ef dd 08 (seen in every step), byte 9 follows Sound: on 01 · off 00
+   ```
+
+**Next setting** investigates another. **Export results** downloads
+`<model>_fw<firmware>_settings-investigation.json`: the card's brand and name
+prefix (such as "Acaia PEARL"), model, model year, firmware and export time,
+then each setting's options, each step's fixture file and latest frame of each
+kind, and the findings. It never holds the device ID, the nickname or Device
+Information. The investigation stays with its card across reconnects, and is
 lost when the page reloads.
 
 ## The page's code
@@ -236,9 +246,13 @@ Tailwind plugins; there is no Vite config file.
   DOM, so its tests drive it with a stub panel and no browser.
 - `ScaleCard` renders a panel's state with `useSyncExternalStore` and passes
   clicks back to it. Each part of the card (`Readouts`, `CommandBar`,
-  `RecordingsSection`, `LogTable`, `ComparePanel`, `SweepSection`) is its own
-  component; a new part, such as a GATT browser, a check list or a weight
-  plot, is another section in `ScaleCard`.
+  `InvestigateSection`, `RecordingsSection`, `LogTable`, `ComparePanel`) is
+  its own component; a new part, such as a GATT browser, a check list or a
+  weight plot, is another section in `ScaleCard`.
+- `createInvestigation` runs the setting wizard against a small interface
+  that `createScale` implements, so its tests use a stub scale.
+  `captureFrames` and `findSettingBytes` are its analysis, and know nothing
+  about any brand.
 - `savedScales` reads and writes saved scales over any Storage-like object;
   `rememberedDevice` and `waitForAdvertisement` find and wake a saved scale
   for `useScales` to connect like a chosen one.
