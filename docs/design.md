@@ -333,9 +333,11 @@ Lunar (2021 per its owner, firmware 1.0.019 A). These are observations, not veri
   every weight message, about 0.22 s apart, with no offset from the start
   command. Powering off (a double tap of the timer button) sent code `08`,
   then an unseen message type `20` with payload `0E 0E 00`, then dropped the
-  connection; `20` is perhaps a shutdown notice. A long press of tare did
-  something not yet identified, and its readings of about 116 g had the bit
-  decoded as negative set.
+  connection; `20` is perhaps a shutdown notice. A long press of tare with a
+  mug on (the manual's "Tare Save": hold to store or subtract a container
+  weight) sent readings of about 116 g with the negative bit set, then 0,
+  which fits the scale showing the container weight it subtracts as a
+  negative number; no button event came with it.
 - **Connections:** a scale drops a connection that sends no heartbeat within a
   few seconds, and needs a few seconds after power-on before it accepts one.
 
