@@ -280,6 +280,29 @@ Lunar (2021 per its owner, firmware 1.0.019 A). These are observations, not veri
 
   Auto connect and bytes 2, 3 and 7 (`01` each: mode, auto-off and the byte
   other sources call resolution) are not otherwise tested.
+- **Pearl S settings frame** (`EF DD 08`, length `1F`, then 30 setting bytes),
+  answering the settings request within about 100 ms:
+  `64 00 02 02 02 00 00 01 01 01 01 00 00 00 00 01 00 FF 02 02 00 03 3C 00 2C 01 84 03 01 01`.
+  Changing one setting at a time in the vendor app:
+  - byte 0 is battery (`64` = 100%);
+  - byte 2 is units, `02` grams and `05` ounces (the Lunar keeps units in
+    byte 1, which is always `00` here);
+  - byte 4 is auto-off as the position in the app's list Never, 5, 10, 20,
+    30, 60 min: `00` never, `03` 20 min, `05` 60 min, and `02` for the
+    original 10 min;
+  - byte 21 bit 0 is sound. It read `03` at first; turning sound off gave
+    `00` and turning it back on gave `01`, and nothing in the app restores
+    bit 1, whose meaning is unknown;
+  - bytes 22–27 read as little-endian 60, 300 and 900 and did not change with
+    auto-off.
+
+  The other bytes have not changed with any setting tried.
+- **Timer record on the Pearl S** (tag 7, 3 bytes: minutes, seconds, tenths)
+  arrives every 0.5 s only while the timer runs, plus once at stop and once
+  at reset, and runs about 0.2–0.3 s ahead of the start command. Reset reads
+  `00 00 02`, the same as the Lunar's idle value. While running the record
+  follows the weight record in the frame; at stop and reset it comes first.
+  The scale sent no acknowledgement of tare.
 - **Units follow the display, so ounces arrive as ounces.** The same object
   settled at `116.4` (units byte `02`, 1 decimal) in grams and `4.106` (units
   byte `05`, 3 decimals) in ounces on the Lunar; 4.106 oz is 116.40 g. A driver
