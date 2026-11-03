@@ -49,9 +49,12 @@ function Detail({ label, children }: { label: string; children: JSX.Element }): 
 export function Readouts({ fields }: { fields: Fields }): JSX.Element {
   return (
     <div className="grid gap-3">
-      <div className="grid grid-cols-[2fr_1fr_1fr] gap-2">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-[2fr_1fr_1fr_1fr]">
         <Stat label="Weight" isLarge>
           <Value fields={fields} name="weight" />
+        </Stat>
+        <Stat label="Flow">
+          <Value fields={fields} name="flow" />
         </Stat>
         <Stat label="Timer">
           <Value fields={fields} name="timer" />
@@ -66,6 +69,12 @@ export function Readouts({ fields }: { fields: Fields }): JSX.Element {
         </Detail>
         <Detail label="Capabilities">
           <Value fields={fields} name="capabilities" />
+        </Detail>
+        <Detail label="Scale firmware">
+          <Value fields={fields} name="scaleFirmware" />
+        </Detail>
+        <Detail label="Model code">
+          <Value fields={fields} name="modelCode" />
         </Detail>
       </dl>
       <details open className="text-sm">

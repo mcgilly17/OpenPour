@@ -1,5 +1,5 @@
 import { BookmarkIcon, TriangleAlertIcon } from "lucide-react";
-import { type JSX, useCallback, useRef, useState, useSyncExternalStore } from "react";
+import { type JSX, useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { CommandBar } from "./CommandBar.js";
 import { ComparePanel } from "./ComparePanel.js";
 import type { PacketRun } from "./comparePackets.js";
@@ -11,6 +11,7 @@ import { InvestigateSection } from "./InvestigateSection.js";
 import { LogTable } from "./LogTable.js";
 import type { MarkSlot, Marks } from "./Marks.js";
 import { NotesList } from "./NotesList.js";
+import { prefillFirmware } from "./prefillFirmware.js";
 import { Readouts } from "./Readouts.js";
 import { RecordingsSection } from "./RecordingsSection.js";
 import { SavedScaleForm } from "./SavedScaleForm.js";
@@ -50,6 +51,10 @@ export function ScaleCard({ panel, name, saved, onSave }: ScaleCardProps): JSX.E
     (slot: MarkSlot, run: PacketRun) => setMarks((marked) => ({ ...marked, [slot]: run })),
     [],
   );
+  const { scaleFirmware } = fields;
+  useEffect(() => {
+    if (scaleFirmware !== undefined) prefillFirmware(exportForm.current, scaleFirmware);
+  }, [scaleFirmware]);
   const title = fields.title ?? "Scale";
   return (
     <Card className="min-w-0 gap-4 py-4">

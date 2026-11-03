@@ -50,9 +50,16 @@ After connecting, the page reads the manufacturer, model number, firmware,
 hardware and software revisions from Device Information and shows them under
 "Bluetooth module". On the scales tested so far these describe the radio chip
 (for example a Microchip BM70), not the scale, so they never fill the export
-form: take the scale's model and firmware from its own app. The page never
+form: take the scale's model from its own app. The page never
 reads the serial number (0x2A25): a serial identifies one scale, and fixtures
 are public.
+
+What the scale says about itself, the driver's `info` event, shows as **Scale
+firmware** and **Model code** (raw hex until codes are known across models). An
+Acaia scale sends it only before it is identified, so the session waits up to
+`INFO_WAIT_MS` for it. When it arrives, the export form's **Firmware** starts
+from it, unless the field already holds something besides `unknown`: a saved
+scale's firmware or what you typed.
 
 ## Recording
 
@@ -135,8 +142,9 @@ The **Driver commands** buttons run the session's own tare, timer start, stop
 and reset, and battery request. The page writes no other bytes. A command that
 can't be sent, because the driver declares it unsupported or no session is
 running, stays disabled: hovering it shows why, and the reasons are listed
-under the buttons. **Timer** and **Battery** show the latest timer and battery
-events.
+under the buttons. **Weight** shows the scale's own value, unit and decimals,
+as its display does, and **Flow** the computed flow in that unit per second.
+**Timer** and **Battery** show the latest timer and battery events.
 
 The connection buttons follow the scale's state the same way: **Reconnect**
 works only once the connection has closed, so one scale never has two

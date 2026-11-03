@@ -26,8 +26,12 @@ export type PanelField =
   | "info"
   | "capabilities"
   | "weight"
+  | "flow"
   | "timer"
   | "battery"
+  /** What the scale says about itself in its `info` event. */
+  | "scaleFirmware"
+  | "modelCode"
   | DeviceInfoField;
 export type ConnectionAction = "disconnect" | "reconnect" | "listen" | "startSession" | "cancel";
 export type PanelAction = ConnectionAction | KnownCommand;

@@ -52,14 +52,21 @@ export function describeScaleEvent(event: ScaleEvent): string {
 
 function showScaleEvent(panel: ScalePanel, event: ScaleEvent): void {
   if (event.type === "state") panel.show("protocol", event.state);
-  if (event.type === "reading") panel.show("weight", describeWeight(event.reading));
+  if (event.type === "reading") {
+    panel.show("weight", describeWeight(event.reading));
+    panel.show("flow", describeFlow(event.reading));
+  }
   if (event.type === "timer") panel.show("timer", describeTimer(event));
   if (event.type === "battery") panel.show("battery", `${event.percent} %`);
+  if (event.type === "info") {
+    panel.show("scaleFirmware", event.firmware);
+    panel.show("modelCode", event.modelCode);
+  }
   if (event.type === "error") panel.addError(`Scale error ${describeError(event.error)}`);
 }
 
 /** Readouts that come from the scale's events, so none outlives the connection. */
-const LIVE_FIELDS = ["weight", "timer", "battery"] as const;
+const LIVE_FIELDS = ["weight", "flow", "timer", "battery"] as const;
 
 /** Shows what the runner reports; the start time and packets go to the recorder instead. */
 export function showRunnerEvent(

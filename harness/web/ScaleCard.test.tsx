@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
 import { TooltipProvider } from "./components/ui/tooltip.js";
@@ -76,5 +76,36 @@ describe("ScaleCard investigating a setting", () => {
 
     expect(answers?.get("model")).toBe("AL008");
     expect(JSON.stringify([...(answers?.entries() ?? [])])).not.toMatch(/Xq7Lm|Kitchen/);
+  });
+});
+
+/** Renders a card, lets `before` act on its export form, then has the scale report firmware 1.0.8. */
+function firmwareAfterInfo(saved?: SavedScale, before: () => void = () => {}): string {
+  const panel = createScalePanel();
+  render(
+    <TooltipProvider>
+      <ScaleCard panel={panel} name="Acaia PEARL" saved={saved} onSave={() => undefined} />
+    </TooltipProvider>,
+  );
+  before();
+  act(() => panel.show("scaleFirmware", "1.0.8"));
+  return (screen.getByLabelText("Firmware") as HTMLInputElement).value;
+}
+
+describe("ScaleCard export firmware", () => {
+  test("starts from the firmware the scale reports when nothing else gave one", () => {
+    expect(firmwareAfterInfo()).toBe("1.0.8");
+    cleanup();
+    expect(firmwareAfterInfo({ ...SAVED, firmware: "unknown" })).toBe("1.0.8");
+  });
+
+  test("keeps a saved scale's firmware", () => {
+    expect(firmwareAfterInfo(SAVED)).toBe("1.0.016");
+  });
+
+  test("keeps what the contributor typed", () => {
+    const typed = () =>
+      fireEvent.change(screen.getByLabelText("Firmware"), { target: { value: "1.0.9" } });
+    expect(firmwareAfterInfo(undefined, typed)).toBe("1.0.9");
   });
 });
