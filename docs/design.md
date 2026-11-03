@@ -288,15 +288,19 @@ Lunar (2021 per its owner, firmware 1.0.019 A). These are observations, not veri
   - byte 2 is units, `02` grams and `05` ounces (the Lunar keeps units in
     byte 1, which is always `00` here);
   - byte 4 is auto-off as the position in the app's list Never, 5, 10, 20,
-    30, 60 min: `00` never, `03` 20 min, `05` 60 min, and `02` for the
-    original 10 min;
+    30, 60 min (`00`–`05`; seen: never, 5, 10, 20 and 60 min);
+  - byte 5 is the touch-lock countdown, as on the Lunar: `00` with touch on,
+    `51` shortly after touch was turned off (the app says the lock lasts
+    120 s);
   - byte 21 bit 0 is sound. It read `03` at first; turning sound off gave
     `00` and turning it back on gave `01`, and nothing in the app restores
     bit 1, whose meaning is unknown;
   - bytes 22–27 read as little-endian 60, 300 and 900 and did not change with
     auto-off.
 
-  The other bytes have not changed with any setting tried.
+  The other bytes have not changed with any setting tried. The app's auto
+  connect setting changed nothing, so it is the app's own; the app's weight
+  and battery settings are units and the battery level above.
 - **Timer record on the Pearl S** (tag 7, 3 bytes: minutes, seconds, tenths)
   arrives every 0.5 s only while the timer runs, plus once at stop and once
   at reset, and runs about 0.2–0.3 s ahead of the start command. Reset reads
