@@ -106,13 +106,18 @@ type ScaleEvent =
   | { type: "button"; button: string }
   | { type: "timer"; running: boolean; ms: number }
   | { type: "state"; state: "handshaking" | "ready" }
+  | { type: "info"; firmware: string; modelCode: string } // what the scale says about itself, once
   | { type: "error"; error: OpenPourError };
+
+type WeightUnit = "g" | "oz";
 
 interface Reading {
   t: number; // ms, the arrival time the app passed in
-  grams: number; // signed; negative after tare is real data
+  value: number; // the number the scale shows, signed; negative after tare is real data
+  unit: WeightUnit; // the scale's own: OpenPour never converts (ADR 0019)
+  decimals: number; // decimal places the scale gives `value`, e.g. 1 for 116.4 g
   stable: boolean; // the device's settled flag, or inferred
-  flowGramsPerSec: number; // computed by OpenPour
+  flowPerSec: number; // computed by OpenPour, in `unit` per second
 }
 
 interface ScaleInfo {
@@ -177,7 +182,8 @@ the same times, as its `tx` lines.
 
 ### Design rules
 
-- **Flow is computed by OpenPour,** not read from the scale. The default is a 500 ms least-squares slope with a ±0.05 g deadband, both adjustable named constants. One calculation keeps curves comparable across brands.
+- **Flow is computed by OpenPour,** not read from the scale, in the reading's unit per second. The default is a 500 ms least-squares slope with a ±0.05 g/s deadband (the same rate in ounces), all adjustable named constants. The filter starts again when the unit changes. One calculation keeps curves comparable across brands.
+- **Readings are in the scale's own unit** (ADR 0019): the value, unit and decimals its display shows. A driver that isn't sure of the unit, for example while a switch made on the scale is confirmed, reports no readings until it is.
 - **Time is always passed in.** OpenPour has no clock or timers; `wakeAt` asks the app to call back. Most scales send no timestamps, so the app's arrival time is the reading's time.
 - **Missing features are reported, not faked.** Capabilities can change after the handshake, for example when a firmware check enables tare.
 - **Drivers reassemble frames** that arrive split or merged across notifications.
@@ -209,16 +215,18 @@ Verified facts move into `spec/acaia.md`, each tied to the fixture that proves i
   | 13   | timer                | start `00 00`, reset `00 01`, stop `00 02` |
 
 - **Messages from the scale:**
-  - type 8, settings (battery is `b1 & 0x7F`);
+  - type 7, the scale describing itself until it is identified (below);
+  - type 8, settings (battery is `b1 & 0x7F`; units below);
   - type 12, events: 5 weight, 7 timer, 8 button, 11 heartbeat reply.
-- **Weight:** a little-endian value in bytes 0–2 (byte 3 not yet known), a decimals byte (divide by 10^n, n = 1–4), and sign bit `0x02` in byte 5. Events chain records: tag 5 weight (6 bytes), 6 battery (1), 7 timer (3: minutes, seconds, tenths), 8 button (1: `00` tare, `08` start, `09` reset, `0A` stop), 11 heartbeat reply (2).
+- **Weight:** a little-endian value in bytes 0–2 (byte 3 not yet known), a decimals byte (divide by 10^n, n = 1–4), and in byte 5 bit `0x01` for a reading that hasn't settled and bit `0x02` for the sign. Events chain records: tag 5 weight (6 bytes), 6 battery (1), 7 timer (3: minutes, seconds, tenths), 8 button (1: `00` tare, `08` start, `09` reset, `0A` stop), 11 heartbeat reply (2).
+- **Units:** the settings' units byte reads `02` grams and `05` ounces. It is byte 1 of the Lunar's 8 setting bytes and byte 2 of the Pearl S's 30, so the driver picks it by the settings' length. A switch made on the scale sends no settings, only weights with other decimals (`UNIT_DECIMALS`: 1 in grams, 3 in ounces, on both scales). From the first such weight the session reports no readings and asks for settings, again every `SETTINGS_REPLY_TIMEOUT_MS` (1 s) while none confirms a unit those decimals fit. An unknown units code holds readings the same way.
+- **Timer state** comes from the timer values alone: running while the value advances (the first value is compared with 0.2 s, the reset value); stopped when a record shows it not advancing, dropping back (a reset, reported as the scale's 0.2 s) or sent ahead of the weight in its message, which is the Pearl S's stop and reset notice. A timer event is sent only when the state or value changes. A button record is reported as a `button` event only, so a press made on the scale never gives two timer events.
 - **Identify:** the scale appears to ignore the 15 bytes. ASCII `012345678901234` is the most widely used choice for both styles.
-- **Handshake:** subscribe, identify, then the notification request. No delays are strictly needed, but a short wait (about 100 ms) after subscribing is common. An inbound type 7 frame means "not identified yet": send identify again. No settings request is needed.
+- **Handshake:** subscribe, wait up to `INFO_WAIT_MS` (1.5 s) for the scale to describe itself in a type 7 frame, identify as soon as it does or the wait ends, then send the notification request. The session reports the description once as an `info` event: bytes 0–1 as the model code in hex, bytes 2–4 as the firmware. A type 7 frame after identifying means "not identified yet": send identify again. Both scales send their settings unasked once identified.
 - **MTU:** request 247 after connecting; the Pyxis is reported to need it. This is the app's job.
 - **Heartbeat:** every 1–2 s on new style; old style is reported at up to 5 s. Re-send the notification request with each heartbeat, since scales may drop it. Keep the interval as a named constant per variant.
 - **Write mode:** old style writes without response.
 - **Heartbeat reply:** type 12 tag 11 carries 2 unknown bytes and is often followed by a weight or timer record in the same frame.
-- **Open questions, captures only:** which bit marks a settled weight (bit `0x01` of byte 5 is unused by every known decoder), and whether weights arrive in ounces when the scale is set to ounces (settings byte 2: `02` grams, `05` ounces).
 - **Connections:** after a drop, wait about 15 s before reconnecting. The scale accepts only one connection at a time.
 - **Lunar 2021:** tare and timer need current firmware. Only 2021+ models report the timer state.
 - **Lunar model year:** check whether a given Lunar is a 2021 or 2025 model; the protocols may differ.
@@ -227,7 +235,9 @@ Verified facts move into `spec/acaia.md`, each tied to the fixture that proves i
 
 First live-harness sessions on a Pearl S (2022, firmware 1.0.008) and a
 Lunar (2021 per its owner, firmware 1.0.019 A). These are observations, not verified facts: each moves to
-`spec/acaia.md` only with a committed fixture (1.1, 1.5b).
+`spec/acaia.md` only with a committed fixture (1.1, 1.5b). The recordings behind the
+units, settled flag, timer and type 7 observations are in `fixtures/acaia/`, and
+the driver follows them.
 
 - **The "new style" service is a module default:** `49535343-…` is the
   Microchip (ISSC) transparent-UART service of the BM70 radio module; Acaia's
@@ -262,7 +272,8 @@ Lunar (2021 per its owner, firmware 1.0.019 A). These are observations, not veri
   Pearl S update to 1.0.009 had not applied). Bytes 0–1 differ between the
   models and are the best guess for a model code, unconfirmed until each is
   constant across connections and a third model is seen. Byte 5 is `01` on
-  both. The session currently treats the frame only as "send identify again".
+  both. No recording holds the Lunar's frame yet: until 1.5c the session
+  identified at once, before the Lunar sent one.
 - **Battery** arrives unrequested about every 20 s on the Pearl S. On the Lunar
   a settings frame byte of `0x4E` decoded as 78%, and the vendor app showed 78%
   at the same time (bit 7 clear; read as "timer not running" by other sources).
@@ -315,14 +326,20 @@ Lunar (2021 per its owner, firmware 1.0.019 A). These are observations, not veri
 - **Units follow the display, so ounces arrive as ounces.** The same object
   settled at `116.4` (units byte `02`, 1 decimal) in grams and `4.106` (units
   byte `05`, 3 decimals) in ounces on the Lunar; 4.106 oz is 116.40 g. A driver
-  that ignores the units byte reports ounces as grams. Whether a units change
-  made on the scale mid-session sends a new settings frame is untested.
-- **Weight byte 5, bit 0 marks an unsettled reading** on the Lunar: set on every
-  reading while the load was changing, clear on every reading at rest and once
-  settled.
+  that ignores the units byte reports ounces as grams. A switch to ounces made
+  on the Pearl S mid-session sent no settings frame: weights stopped for about
+  1.2 s, then two arrived in one notification reading 25.395 and 14.78 oz (the
+  scale mid-switch), then 4.170 oz onward, all with 3 decimals instead of 1.
+- **Weight byte 5, bit 0 marks an unsettled reading** on the Lunar and the
+  Pearl S: set on every reading while the load was changing, clear on every
+  reading at rest and once settled.
 - **Timer record on the old Lunar:** every weight frame carries `07 00 00 02`,
   which decodes as "stopped at 0.2 s" and never changes while the timer is
-  idle. Unverified until the timer is run (check C9).
+  idle; it reads the same after a reset.
+- **Settings requests:** the Pearl S answered each of 16 requests with its
+  settings, 75–175 ms later. The Lunar's one request so far, sent 16 ms after
+  the settings it sends unasked, drew no reply in the 1.8 s before the
+  recording ended, so whether it answers a request is unknown.
 - **Lunar buttons and timer** (one recording, tests run back to back): a
   button press arrives as a tag `08` record inside a weight message, `08`
   then a code. Timer start on the scale's button sent code `08` (with a weight

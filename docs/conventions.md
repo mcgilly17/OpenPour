@@ -45,10 +45,10 @@ if (Math.abs(delta) < 0.05) return 0
 5. **`interface` for things, `type` for unions and combinations.**
 
    ```ts
-   interface Reading { t: number; grams: number; stable: boolean; flowGramsPerSec: number }
+   interface Reading { t: number; value: number; unit: WeightUnit; decimals: number; stable: boolean; flowPerSec: number }
    type ScaleEvent = ButtonEvent | TimerEvent
    ```
-6. **Units in names.** Use `grams`, `…Ms` and `…GramsPerSec`, never a bare `weight` or `delay`.
+6. **Units in names.** Use `grams`, `…Ms` and `…GramsPerSec`, never a bare `weight` or `delay`. A value whose unit travels with it, like a `Reading`'s `value` and `unit`, is the exception.
 
 ## Modules and files
 
