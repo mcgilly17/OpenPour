@@ -338,6 +338,14 @@ Lunar (2021 per its owner, firmware 1.0.019 A). These are observations, not veri
   weight) sent readings of about 116 g with the negative bit set, then 0,
   which fits the scale showing the container weight it subtracts as a
   negative number; no button event came with it.
+- **Pearl S buttons** (one recording): neither tare nor the timer button sent
+  a button event. Tare on the scale only dropped the weight to 0. A timer
+  start shows only as timer records appearing; stop sends one timer-first
+  record with the final time and reset one reading `00 00 02`, after which
+  timer records stop. Touching the buttons adds a few grams of load. Powering
+  off sent no shutdown message: the timer started (the same button), a
+  press of about 258 g registered, and the scale went silent. A battery
+  record (tag 6) sometimes rides along with a weight record.
 - **Connections:** a scale drops a connection that sends no heartbeat within a
   few seconds, and needs a few seconds after power-on before it accepts one.
 
