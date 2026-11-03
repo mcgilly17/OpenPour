@@ -10,6 +10,7 @@ import type {
 } from "../../core/types.js";
 import { type AcaiaCommand, commands } from "./commands.js";
 import { createFrameReader, type Frame } from "./createFrameReader.js";
+import { createTimerTracker } from "./createTimerTracker.js";
 import { type AcaiaMessage, type AcaiaRecord, decodeMessage } from "./decodeMessage.js";
 import { type AcaiaVariant, normalizeUuid } from "./findVariant.js";
 
@@ -60,17 +61,22 @@ function merge(outputs: Output[]): Output {
   };
 }
 
+/** Whether a weight record follows record `i` in the same message (see `TimerTracker`). */
+function isAheadOfWeight(records: AcaiaRecord[], i: number): boolean {
+  return records.slice(i + 1).some((r) => r.kind === "weight");
+}
+
 /** One connected Acaia scale. The variant comes from the GATT layout (see `findVariant`). */
 export function createAcaiaSession(variant: AcaiaVariant): ScaleSession {
   const reader = createFrameReader();
   const flow = createFlowFilter();
+  const timer = createTimerTracker();
   const notifyChr = normalizeUuid(variant.notifyChr);
   let phase: Phase = "waitingForInfo";
   let wakeAt = 0;
   let lastFrameAt = 0;
   let isSilent = false;
   let hasReportedInfo = false;
-  let isTimerRunning = false;
   /** The unit the last settings gave; undefined before any, and while a unit switch is confirmed. */
   let unit: WeightUnit | undefined;
   let settingsAskedAt = 0;
@@ -114,14 +120,14 @@ export function createAcaiaSession(variant: AcaiaVariant): ScaleSession {
     switch (record?.kind) {
       case "weight":
         return weightOutput(record, t);
-      case "timer":
-        return only({ type: "timer", running: isTimerRunning, ms: record.ms });
+      case "timer": {
+        const event = timer.push(record.ms, isAheadOfWeight(records, i));
+        return event ? only(event) : NOTHING;
+      }
       case "battery":
         return only({ type: "battery", percent: record.percent });
       case "button":
         if (record.button === "tare") flow.reset();
-        if (record.button === "start") isTimerRunning = true;
-        if (record.button === "stop" || record.button === "reset") isTimerRunning = false;
         return only({ type: "button", button: record.button });
       default:
         return NOTHING;
@@ -134,7 +140,6 @@ export function createAcaiaSession(variant: AcaiaVariant): ScaleSession {
         return merge(message.records.map((_, i) => recordOutput(message.records, i, t)));
       case "settings":
         unit = message.settings.unit;
-        isTimerRunning = message.settings.isTimerRunning;
         return only({ type: "battery", percent: message.settings.batteryPercent });
       case "info":
         if (hasReportedInfo) return NOTHING;
@@ -219,18 +224,9 @@ export function createAcaiaSession(variant: AcaiaVariant): ScaleSession {
       return send("tare");
     },
     timer: {
-      start() {
-        isTimerRunning = true;
-        return send("timerStart");
-      },
-      stop() {
-        isTimerRunning = false;
-        return send("timerStop");
-      },
-      reset() {
-        isTimerRunning = false;
-        return send("timerReset");
-      },
+      start: () => send("timerStart"),
+      stop: () => send("timerStop"),
+      reset: () => send("timerReset"),
     },
     requestBattery: () => send("getSettings"),
   };

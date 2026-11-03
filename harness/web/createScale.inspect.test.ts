@@ -76,8 +76,8 @@ describe("createScale log", () => {
       `${identified + 400} reading`,
       `${identified + 500} rx ${RX.weight.slice(0, 16)}`,
       `${identified + 510} rx ${RX.weight.slice(16)}`,
+      // The timer still reads 0.2 s, so only the weight is new.
       `${identified + 510} reading`,
-      `${identified + 510} timer`,
     ]);
   });
 
@@ -108,13 +108,12 @@ describe("createScale driver commands", () => {
     await vi.advanceTimersByTimeAsync(0);
     notifyHex(gatt, RX.settings, clock.now());
     notifyHex(gatt, RX.timer, clock.now());
-    click(panel, "timerStart");
-    notifyHex(gatt, RX.timer, clock.now());
+    notifyHex(gatt, RX.timerStopNotice, clock.now());
 
     const sent = [TX.tare, TX.timerStart, TX.timerStop, TX.timerReset, TX.getSettings];
     expect(writtenHex(gatt).slice(before, before + sent.length)).toEqual(sent);
     expect(shown(panel, "battery")).toEqual(["93 %"]);
-    expect(shown(panel, "timer")).toEqual(["stopped, 90.5 s", "running, 90.5 s"]);
+    expect(shown(panel, "timer")).toEqual(["running, 90.5 s", "stopped, 4.5 s"]);
   });
 
   test("a capability the driver declares false disables its buttons with the reason, and they send nothing", async () => {

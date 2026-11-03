@@ -12,7 +12,6 @@ export type AcaiaRecord =
 
 export interface AcaiaSettings {
   batteryPercent: number;
-  isTimerRunning: boolean;
   /** Undefined for a units code not seen yet. */
   unit: WeightUnit | undefined;
 }
@@ -58,7 +57,8 @@ const BUTTONS: ReadonlyMap<number, AcaiaButton> = new Map([
 
 const UNSETTLED_FLAG = 0x01;
 const NEGATIVE_FLAG = 0x02;
-const TIMER_RUNNING_FLAG = 0x80;
+/** Other sources read bit 7 of the battery byte as "timer running"; it is not part of the level. */
+const BATTERY_MASK = 0x7f;
 const UNITS: ReadonlyMap<number, WeightUnit> = new Map([
   [0x02, "g"],
   [0x05, "oz"],
@@ -129,11 +129,7 @@ function decodeSettings(payload: Uint8Array): AcaiaSettings | undefined {
   const battery = payload[0];
   const units = payload[payload.length >= LONG_SETTINGS_BYTES ? 2 : 1];
   if (battery === undefined || units === undefined) return undefined;
-  return {
-    batteryPercent: battery & ~TIMER_RUNNING_FLAG,
-    isTimerRunning: (battery & TIMER_RUNNING_FLAG) !== 0,
-    unit: UNITS.get(units),
-  };
+  return { batteryPercent: battery & BATTERY_MASK, unit: UNITS.get(units) };
 }
 
 function decodeInfo(payload: Uint8Array): AcaiaInfo | undefined {

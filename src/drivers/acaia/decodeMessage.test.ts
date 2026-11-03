@@ -111,28 +111,24 @@ describe("decodeMessage: buttons", () => {
 });
 
 describe("decodeMessage: settings", () => {
-  test("decodes battery, timer state and units from byte 1 of the Lunar's 8 bytes", () => {
+  test("decodes battery, masking bit 7, and units from byte 1 of the Lunar's 8 bytes", () => {
     expect(decode("settings")).toEqual({
       type: "settings",
-      settings: { batteryPercent: 93, isTimerRunning: false, unit: "g" },
+      settings: { batteryPercent: 93, unit: "g" },
     });
-    expect(decode("settingsTimerStopped")).toMatchObject({
-      settings: { batteryPercent: 74, isTimerRunning: false },
-    });
-    expect(decode("settingsTimerRunning")).toMatchObject({
-      settings: { batteryPercent: 74, isTimerRunning: true },
-    });
+    expect(decode("settingsTimerStopped")).toMatchObject({ settings: { batteryPercent: 74 } });
+    expect(decode("settingsTimerRunning")).toMatchObject({ settings: { batteryPercent: 74 } });
     expect(decode("settingsOunces")).toMatchObject({ settings: { unit: "oz" } });
     expect(decode("settingsLunarOunces")).toEqual({
       type: "settings",
-      settings: { batteryPercent: 75, isTimerRunning: false, unit: "oz" },
+      settings: { batteryPercent: 75, unit: "oz" },
     });
   });
 
   test("reads units from byte 2 of the Pearl S's 30 bytes", () => {
     expect(decode("settingsPearlS")).toEqual({
       type: "settings",
-      settings: { batteryPercent: 100, isTimerRunning: false, unit: "g" },
+      settings: { batteryPercent: 100, unit: "g" },
     });
     expect(decode("settingsPearlSOunces")).toMatchObject({ settings: { unit: "oz" } });
   });
