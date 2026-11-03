@@ -1,66 +1,26 @@
 import { describe, expect, test } from "vitest";
 
 import { isOpenPourError } from "../../core/errors.js";
-import type { Command, GattLayout, ScaleSession } from "../../core/types.js";
-import type { Fixture, FixtureRecord } from "../../replay/parseFixture.js";
-import { bytesToHex, replay } from "../../replay/replay.js";
+import type { GattLayout } from "../../core/types.js";
+import { bytesToHex } from "../../replay/replay.js";
 import { ACAIA_VECTORS as RX, ACAIA_COMMAND_VECTORS as TX } from "../../test/acaiaVectors.js";
+import {
+  hexOf,
+  NEW_STYLE_GATT,
+  NOTIFY,
+  OLD_STYLE_GATT,
+  runAcaia,
+  rx,
+  SVC,
+  synthetic,
+  WRITE,
+} from "../../test/runAcaia.js";
 import { acaia } from "./acaia.js";
-import { SILENCE_TIMEOUT_MS, SUBSCRIBE_SETTLE_MS } from "./createAcaiaSession.js";
+import { INFO_WAIT_MS, SILENCE_TIMEOUT_MS } from "./createAcaiaSession.js";
 import { encodeFrame } from "./encodeFrame.js";
 import { NEW_STYLE_HEARTBEAT_MS, OLD_STYLE_HEARTBEAT_MS } from "./findVariant.js";
 
-const SVC = "49535343-FE7D-4AE5-8FA9-9FAFD205E455";
-const WRITE = "49535343-8841-43F4-A8D4-ECBE34729BB3";
-const NOTIFY = "49535343-1E4D-4BD9-BA61-23C647249616";
-
-const NEW_STYLE_GATT: GattLayout = [
-  { uuid: "180A", characteristics: [{ uuid: "2A29", properties: ["read"] }] },
-  {
-    uuid: SVC,
-    characteristics: [
-      { uuid: WRITE, properties: ["write", "writeWithoutResponse"] },
-      { uuid: NOTIFY, properties: ["notify"] },
-    ],
-  },
-];
-const OLD_STYLE_GATT: GattLayout = [
-  { uuid: "0x1820", characteristics: [{ uuid: "2A80", properties: ["notify", "write"] }] },
-];
-
 const NOT_IDENTIFIED = bytesToHex(encodeFrame(7, Uint8Array.of(0x01)));
-
-function rx(t: number, hex: string, chr = NOTIFY): FixtureRecord {
-  return { t, dir: "rx", svc: SVC, chr, hex };
-}
-
-function fixture(...records: FixtureRecord[]): Fixture {
-  return {
-    header: {
-      v: 1,
-      brand: "Acaia",
-      model: "Synthetic",
-      firmware: "0.0.0",
-      captured: "2026-11-01",
-      tool: "hand-written",
-      scenario: "unit",
-      scrubbed: true,
-    },
-    records,
-  };
-}
-
-function hexOf(command: Command): string {
-  return command.type === "write" ? bytesToHex(command.bytes) : command.type;
-}
-
-function run(session: ScaleSession, ...records: FixtureRecord[]) {
-  const result = replay(session, fixture(...records));
-  const writesAt = (t: number): string[] =>
-    result.commands.filter((c) => c.t === t).map((c) => hexOf(c.command));
-  const eventsOf = (type: string) => result.events.filter(({ event }) => event.type === type);
-  return { ...result, writesAt, eventsOf };
-}
 
 describe("acaia driver", () => {
   test("picks the variant from the GATT layout, not the name", () => {
@@ -95,39 +55,68 @@ describe("acaia driver", () => {
 });
 
 describe("acaia session handshake", () => {
-  test("subscribes, waits, identifies, then reports ready on the first data", () => {
-    const result = run(acaia.createSession(NEW_STYLE_GATT), rx(0, ""), rx(500, RX.weight));
+  test("subscribes, waits for the scale's description, identifies, then reports ready on data", () => {
+    const result = runAcaia(
+      synthetic(rx(INFO_WAIT_MS + 100, RX.settings), rx(INFO_WAIT_MS + 200, RX.weight)),
+    );
 
     expect(result.commands[0]?.command).toEqual({ type: "subscribe", svc: SVC, chr: NOTIFY });
-    expect(result.writesAt(SUBSCRIBE_SETTLE_MS)).toEqual([TX.identify, TX.notificationRequest]);
+    expect(result.writesAt(INFO_WAIT_MS)).toEqual([TX.identify, TX.notificationRequest]);
     expect(result.events.map(({ t, event }) => [t, event.type])).toEqual([
       [0, "state"],
-      [500, "state"],
-      [500, "reading"],
-      [500, "timer"],
+      [INFO_WAIT_MS + 100, "state"],
+      [INFO_WAIT_MS + 100, "battery"],
+      [INFO_WAIT_MS + 200, "reading"],
+      [INFO_WAIT_MS + 200, "timer"],
     ]);
     expect(result.events[1]?.event).toEqual({ type: "state", state: "ready" });
   });
 
+  test("identifies as soon as the scale describes itself, and reports the description once", () => {
+    const result = runAcaia(synthetic(rx(60, RX.infoPearlS), rx(430, RX.infoPearlS)));
+
+    expect(result.writesAt(60)).toEqual([TX.identify, TX.notificationRequest]);
+    expect(result.writesAt(430)).toEqual([TX.identify]);
+    expect(result.writesAt(INFO_WAIT_MS)).toEqual([]);
+    expect(result.eventsOf("info")).toEqual([
+      { type: "info", firmware: "1.0.8", modelCode: "035c" },
+    ]);
+    expect(result.eventsOf("state")).toEqual([{ type: "state", state: "handshaking" }]);
+  });
+
+  test("reports the Lunar's description the same way", () => {
+    const result = runAcaia(synthetic(rx(1150, RX.infoLunar, "2A80")), OLD_STYLE_GATT);
+
+    expect(result.writesAt(1150)).toEqual([TX.identify, TX.notificationRequest]);
+    expect(result.eventsOf("info")).toEqual([
+      { type: "info", firmware: "1.0.19", modelCode: "021a" },
+    ]);
+  });
+
+  test("identifies on a not-identified frame too short to describe the scale", () => {
+    const result = runAcaia(synthetic(rx(300, NOT_IDENTIFIED), rx(600, NOT_IDENTIFIED)));
+
+    expect(result.writesAt(300)).toEqual([TX.identify, TX.notificationRequest]);
+    expect(result.writesAt(600)).toEqual([TX.identify]);
+    expect(result.eventsOf("info")).toEqual([]);
+  });
+
   test("re-identifies on heartbeats until the scale answers", () => {
-    const firstBeat = SUBSCRIBE_SETTLE_MS + NEW_STYLE_HEARTBEAT_MS;
-    const result = run(acaia.createSession(NEW_STYLE_GATT), rx(0, ""), rx(firstBeat, ""));
+    const firstBeat = INFO_WAIT_MS + NEW_STYLE_HEARTBEAT_MS;
+    const result = runAcaia(synthetic(rx(firstBeat, "")));
 
     expect(result.writesAt(firstBeat)).toEqual([TX.identify, TX.heartbeat, TX.notificationRequest]);
   });
 
-  test("identifies again when the scale says it isn't identified", () => {
-    const result = run(acaia.createSession(NEW_STYLE_GATT), rx(0, ""), rx(300, NOT_IDENTIFIED));
-    expect(result.writesAt(300)).toEqual([TX.identify]);
-  });
-
   test("heartbeats with a notification request once ready, at the variant's interval", () => {
-    const t1 = SUBSCRIBE_SETTLE_MS + OLD_STYLE_HEARTBEAT_MS;
-    const result = run(
-      acaia.createSession(OLD_STYLE_GATT),
-      rx(0, ""),
-      rx(200, RX.weight, "2A80"),
-      rx(t1, RX.weight, "2A80"),
+    const t1 = INFO_WAIT_MS + OLD_STYLE_HEARTBEAT_MS;
+    const result = runAcaia(
+      synthetic(
+        rx(INFO_WAIT_MS + 50, RX.settings, "2A80"),
+        rx(INFO_WAIT_MS + 100, RX.weight, "2A80"),
+        rx(t1, RX.weight, "2A80"),
+      ),
+      OLD_STYLE_GATT,
     );
     expect(result.writesAt(t1)).toEqual([TX.heartbeat, TX.notificationRequest]);
   });
@@ -135,72 +124,61 @@ describe("acaia session handshake", () => {
 
 describe("acaia session data", () => {
   test("decodes weight, timer, buttons and battery into events", () => {
-    const result = run(
-      acaia.createSession(NEW_STYLE_GATT),
-      rx(0, ""),
-      rx(200, RX.buttonStart),
-      rx(300, RX.timer),
-      rx(400, RX.settings),
-      rx(500, RX.ackWithNegativeWeight),
+    const result = runAcaia(
+      synthetic(
+        rx(200, RX.buttonStart),
+        rx(300, RX.timer),
+        rx(400, RX.settings),
+        rx(500, RX.ackWithNegativeWeight),
+      ),
     );
 
-    expect(result.eventsOf("button").map((e) => e.event)).toEqual([
-      { type: "button", button: "start" },
+    expect(result.eventsOf("button")).toEqual([{ type: "button", button: "start" }]);
+    expect(result.eventsOf("timer")).toEqual([{ type: "timer", running: true, ms: 90_500 }]);
+    expect(result.eventsOf("battery")).toEqual([{ type: "battery", percent: 93 }]);
+    expect(result.readings()).toEqual([
+      { t: 500, value: -598, unit: "g", decimals: 1, stable: true, flowPerSec: 0 },
     ]);
-    expect(result.eventsOf("timer")[0]?.event).toEqual({
-      type: "timer",
-      running: true,
-      ms: 90_500,
-    });
-    expect(result.eventsOf("battery")[0]?.event).toEqual({ type: "battery", percent: 93 });
-    expect(result.eventsOf("reading").at(-1)?.event).toMatchObject({
-      reading: { t: 500, grams: -598 },
-    });
   });
 
   test("computes flow from successive weights and restarts it on a tare button", () => {
     const rising = (grams: number) => {
       const tenths = Math.round(grams * 10);
-      const body = Uint8Array.of(0x05, tenths & 0xff, tenths >> 8, 0, 0, 1, 0);
+      const body = Uint8Array.of(0x05, tenths & 0xff, tenths >> 8, 0, 0, 1, 1);
       return bytesToHex(encodeFrame(12, Uint8Array.of(body.length + 1, ...body)));
     };
-    const result = run(
-      acaia.createSession(NEW_STYLE_GATT),
-      rx(0, ""),
-      rx(200, rising(10)),
-      rx(300, rising(11)),
-      rx(400, rising(12)),
-      rx(500, RX.buttonTare),
+    const result = runAcaia(
+      synthetic(
+        rx(100, RX.settings),
+        rx(200, rising(10)),
+        rx(300, rising(11)),
+        rx(400, rising(12)),
+        rx(500, RX.buttonTare),
+      ),
     );
 
-    const readings = result
-      .eventsOf("reading")
-      .map(({ event }) => (event.type === "reading" ? event.reading : undefined));
-    expect(readings[2]?.flowGramsPerSec).toBeCloseTo(10);
-    expect(readings[2]?.stable).toBe(false);
-    expect(readings[3]).toMatchObject({ grams: 175.9, flowGramsPerSec: 0, stable: true });
+    const readings = result.readings();
+    expect(readings[2]).toMatchObject({ value: 12, unit: "g", stable: false });
+    expect(readings[2]?.flowPerSec).toBeCloseTo(10);
+    expect(readings[3]).toMatchObject({ value: 175.9, flowPerSec: 0, stable: true });
   });
 
   test("ignores notifications from other characteristics", () => {
-    const result = run(acaia.createSession(NEW_STYLE_GATT), rx(0, ""), rx(200, RX.weight, "2A19"));
+    const result = runAcaia(synthetic(rx(100, RX.settings, "2A19"), rx(200, RX.weight, "2A19")));
     expect(result.eventsOf("reading")).toEqual([]);
   });
 
   test("reports silence once as a timeout, and again after data resumes and stops", () => {
-    const beat = (n: number) => SUBSCRIBE_SETTLE_MS + n * NEW_STYLE_HEARTBEAT_MS;
-    const result = run(
-      acaia.createSession(NEW_STYLE_GATT),
-      rx(0, ""),
-      rx(beat(8), ""),
-      rx(beat(8) + 1, RX.weight),
-      rx(beat(16), ""),
+    const beat = (n: number) => INFO_WAIT_MS + n * NEW_STYLE_HEARTBEAT_MS;
+    const result = runAcaia(
+      synthetic(rx(beat(8), ""), rx(beat(8) + 1, RX.weight), rx(beat(16), "")),
     );
 
-    const errors = result
-      .eventsOf("error")
-      .map(({ t, event }) => [t, event.type === "error" && event.error.code]);
+    const errors = result.events.flatMap(({ t, event }) =>
+      event.type === "error" ? [[t, event.error.code]] : [],
+    );
     expect(errors).toEqual([
-      [beat(5), "timeout"],
+      [beat(4), "timeout"],
       [beat(14), "timeout"],
     ]);
     expect(SILENCE_TIMEOUT_MS).toBe(5000);
@@ -224,6 +202,6 @@ describe("acaia session commands", () => {
   test("a tick before the wake-up does nothing and keeps the wake-up", () => {
     const session = acaia.createSession(NEW_STYLE_GATT);
     session.start(0);
-    expect(session.tick(50)).toEqual({ events: [], commands: [], wakeAt: SUBSCRIBE_SETTLE_MS });
+    expect(session.tick(50)).toEqual({ events: [], commands: [], wakeAt: INFO_WAIT_MS });
   });
 });

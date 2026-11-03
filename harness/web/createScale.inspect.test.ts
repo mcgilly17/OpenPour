@@ -1,5 +1,5 @@
 import type { Driver } from "openpour";
-import { acaia, SUBSCRIBE_SETTLE_MS } from "openpour/acaia";
+import { acaia, INFO_WAIT_MS } from "openpour/acaia";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
 import { ACAIA_VECTORS as RX, ACAIA_COMMAND_VECTORS as TX } from "../../src/test/acaiaVectors.js";
@@ -46,36 +46,38 @@ describe("createScale log", () => {
       recordingStartT: 500,
     });
     await connected;
+    // On the fixture's time base: the session identifies INFO_WAIT_MS after starting.
+    const identified = 500 + INFO_WAIT_MS;
     const traffic: [number, string][] = [
-      [1200, RX.weight],
-      [1300, RX.settings],
-      [1400, RX.buttonStart],
-      [1500, RX.weight.slice(0, 16)],
-      [1510, RX.weight.slice(16)],
+      [identified + 200, RX.settings],
+      [identified + 300, RX.weight],
+      [identified + 400, RX.buttonStart],
+      [identified + 500, RX.weight.slice(0, 16)],
+      [identified + 510, RX.weight.slice(16)],
     ];
     for (const [t, hex] of traffic) {
-      await advanceTo(clock, t);
-      notifyHex(gatt, hex, t);
+      await advanceTo(clock, t + 500);
+      notifyHex(gatt, hex, t + 500);
     }
 
     expect(logged(panel).map(describeEntry)).toEqual([
       "500 #1 session started",
       "500 state",
-      `600 tx ${TX.identify}`,
-      `600 tx ${TX.notificationRequest}`,
-      `700 rx ${RX.weight}`,
-      "700 state",
-      "700 reading",
-      "700 timer",
-      `800 rx ${RX.settings}`,
-      "800 battery",
-      `900 rx ${RX.buttonStart}`,
-      "900 button",
-      "900 reading",
-      `1000 rx ${RX.weight.slice(0, 16)}`,
-      `1010 rx ${RX.weight.slice(16)}`,
-      "1010 reading",
-      "1010 timer",
+      `${identified} tx ${TX.identify}`,
+      `${identified} tx ${TX.notificationRequest}`,
+      `${identified + 200} rx ${RX.settings}`,
+      `${identified + 200} state`,
+      `${identified + 200} battery`,
+      `${identified + 300} rx ${RX.weight}`,
+      `${identified + 300} reading`,
+      `${identified + 300} timer`,
+      `${identified + 400} rx ${RX.buttonStart}`,
+      `${identified + 400} button`,
+      `${identified + 400} reading`,
+      `${identified + 500} rx ${RX.weight.slice(0, 16)}`,
+      `${identified + 510} rx ${RX.weight.slice(16)}`,
+      `${identified + 510} reading`,
+      `${identified + 510} timer`,
     ]);
   });
 
@@ -99,7 +101,7 @@ describe("createScale driver commands", () => {
     const gatt = stubGatt(ACAIA_GATT);
     const { clock, panel, connected } = connectTo(gatt);
     await connected;
-    await advanceTo(clock, SUBSCRIBE_SETTLE_MS);
+    await advanceTo(clock, INFO_WAIT_MS);
     const before = writtenHex(gatt).length;
 
     for (const command of KNOWN_COMMANDS) click(panel, command);
@@ -126,7 +128,7 @@ describe("createScale driver commands", () => {
     const gatt = stubGatt(ACAIA_GATT);
     const { clock, panel, connected } = connectTo(gatt, { driver: noTimer });
     await connected;
-    await advanceTo(clock, SUBSCRIBE_SETTLE_MS);
+    await advanceTo(clock, INFO_WAIT_MS);
     const before = writtenHex(gatt).length;
 
     for (const command of ["timerStart", "timerStop", "timerReset"] as const) click(panel, command);

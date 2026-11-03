@@ -19,15 +19,21 @@ export type Command =
   | { type: "write"; svc: string; chr: string; bytes: Uint8Array; mode: "response" | "noResponse" }
   | { type: "read"; svc: string; chr: string };
 
+/** The unit a scale weighs in. OpenPour reports the scale's own and never converts (ADR 0019). */
+export type WeightUnit = "g" | "oz";
+
 export interface Reading {
   /** Arrival time in ms, as passed in by the app. */
   t: number;
-  /** Signed: a negative weight after tare is real data. */
-  grams: number;
+  /** The number the scale shows, in `unit`. Signed: a negative weight after tare is real data. */
+  value: number;
+  unit: WeightUnit;
+  /** How many decimal places the scale gives `value`, e.g. 1 for 116.4 g. */
+  decimals: number;
   /** The device's settled flag, or inferred when the device has none. */
   stable: boolean;
-  /** Computed by OpenPour so curves compare across brands. */
-  flowGramsPerSec: number;
+  /** Computed by OpenPour so curves compare across brands, in `unit` per second. */
+  flowPerSec: number;
 }
 
 export type ScaleEvent =
@@ -36,6 +42,8 @@ export type ScaleEvent =
   | { type: "button"; button: string }
   | { type: "timer"; running: boolean; ms: number }
   | { type: "state"; state: "handshaking" | "ready" }
+  /** What the scale says about itself, once per session; `modelCode` is raw hex until codes are confirmed. */
+  | { type: "info"; firmware: string; modelCode: string }
   | { type: "error"; error: OpenPourError };
 
 /**

@@ -15,9 +15,13 @@ export function describeCapabilities(capabilities: Capabilities): string {
   return [...flags, `${resolutionGrams} g resolution`, `up to ${maxRateHz} Hz`].join(", ");
 }
 
-/** The decoded value as is: rounding here could hide a decoding fault. */
-function describeReading({ grams, stable }: Reading): string {
-  return `${grams} g${stable ? ", stable" : ""}`;
+/** The value in the scale's own unit and decimals, as its display shows it: never converted. */
+function describeWeight({ value, unit, decimals, stable }: Reading): string {
+  return `${value.toFixed(decimals)} ${unit}${stable ? ", stable" : ""}`;
+}
+
+function describeFlow({ flowPerSec, unit, decimals }: Reading): string {
+  return `${flowPerSec.toFixed(decimals)} ${unit}/s`;
 }
 
 type TimerEvent = Extract<ScaleEvent, { type: "timer" }>;
@@ -30,7 +34,7 @@ function describeTimer({ running, ms }: TimerEvent): string {
 export function describeScaleEvent(event: ScaleEvent): string {
   switch (event.type) {
     case "reading":
-      return `reading ${describeReading(event.reading)}`;
+      return `reading ${describeWeight(event.reading)}, flow ${describeFlow(event.reading)}`;
     case "battery":
       return `battery ${event.percent} %`;
     case "timer":
@@ -39,6 +43,8 @@ export function describeScaleEvent(event: ScaleEvent): string {
       return `button ${event.button}`;
     case "state":
       return `state ${event.state}`;
+    case "info":
+      return `info firmware ${event.firmware}, model code ${event.modelCode}`;
     case "error":
       return `error ${describeError(event.error)}`;
   }
@@ -46,7 +52,7 @@ export function describeScaleEvent(event: ScaleEvent): string {
 
 function showScaleEvent(panel: ScalePanel, event: ScaleEvent): void {
   if (event.type === "state") panel.show("protocol", event.state);
-  if (event.type === "reading") panel.show("weight", describeReading(event.reading));
+  if (event.type === "reading") panel.show("weight", describeWeight(event.reading));
   if (event.type === "timer") panel.show("timer", describeTimer(event));
   if (event.type === "battery") panel.show("battery", `${event.percent} %`);
   if (event.type === "error") panel.addError(`Scale error ${describeError(event.error)}`);

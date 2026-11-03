@@ -2,6 +2,7 @@ export { isOpenPourError, OpenPourError, type OpenPourErrorCode } from "./core/e
 export {
   createFlowFilter,
   FLOW_DEADBAND_GRAMS_PER_SEC,
+  FLOW_DEADBAND_PER_SEC,
   FLOW_WINDOW_MS,
   type FlowFilter,
   type FlowFilterOptions,
@@ -17,4 +18,5 @@ export type {
   ScaleInfo,
   ScaleSession,
   Step,
+  WeightUnit,
 } from "./core/types.js";

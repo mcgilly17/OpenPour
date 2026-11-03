@@ -1,4 +1,4 @@
-import { acaia, NEW_STYLE_HEARTBEAT_MS, SUBSCRIBE_SETTLE_MS } from "openpour/acaia";
+import { acaia, INFO_WAIT_MS, NEW_STYLE_HEARTBEAT_MS } from "openpour/acaia";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
 import { ACAIA_VECTORS as RX, ACAIA_COMMAND_VECTORS as TX } from "../../src/test/acaiaVectors.js";
@@ -60,7 +60,8 @@ describe("createScale", () => {
     const gatt = stubGatt(ACAIA_GATT);
     const { clock, panel, connected } = connectTo(gatt);
     await connected;
-    await advanceTo(clock, SUBSCRIBE_SETTLE_MS);
+    await advanceTo(clock, INFO_WAIT_MS);
+    notifyHex(gatt, RX.settings, clock.now());
     notifyHex(gatt, RX.weight, clock.now());
     expect(weightsShown(panel).at(-1)).toContain("175.9 g");
 
@@ -75,10 +76,10 @@ describe("createScale", () => {
     const { clock, panel, connected } = connectTo(gatt);
 
     await connected;
-    await advanceTo(clock, SUBSCRIBE_SETTLE_MS - 1);
+    await advanceTo(clock, INFO_WAIT_MS - 1);
     const opened = [...TWO_SERVICE_DISCOVERY, ...DEVICE_INFO_READS];
     expect(operationsOn(gatt)).toEqual([...opened, "startNotifications"]);
-    await advanceTo(clock, SUBSCRIBE_SETTLE_MS);
+    await advanceTo(clock, INFO_WAIT_MS);
 
     expect(operationsOn(gatt)).toEqual([...opened, ...HANDSHAKE]);
     expect(panel.setConnection.mock.calls).toEqual([["connecting"], ["connected"]]);
@@ -88,7 +89,7 @@ describe("createScale", () => {
   test("Device Information is shown, never fills the export form and never becomes a packet", async () => {
     const { clock, panel, connected } = connectTo(pearlS());
     await connected;
-    await advanceTo(clock, SUBSCRIBE_SETTLE_MS);
+    await advanceTo(clock, INFO_WAIT_MS);
 
     const fixture = exportFixture(panel, 1);
 
@@ -100,12 +101,12 @@ describe("createScale", () => {
   test("an exported fixture records when the session started, before its first write", async () => {
     const { clock, panel, connected } = connectTo(stubGatt(ACAIA_GATT));
     await connected;
-    await advanceTo(clock, SUBSCRIBE_SETTLE_MS);
+    await advanceTo(clock, INFO_WAIT_MS);
 
     const fixture = exportFixture(panel, 1);
 
     expect(fixture?.header.sessionStartT).toBe(0);
-    expect(fixture?.records[0]?.t).toBe(SUBSCRIBE_SETTLE_MS);
+    expect(fixture?.records[0]?.t).toBe(INFO_WAIT_MS);
   });
 });
 
@@ -125,7 +126,7 @@ describe("createScale and device identifiers", () => {
     Object.assign(gatt.device, { id: deviceId });
     const { clock, panel, connected } = connectTo(gatt);
     await connected;
-    await advanceTo(clock, SUBSCRIBE_SETTLE_MS);
+    await advanceTo(clock, INFO_WAIT_MS);
     notifyHex(gatt, RX.weight, clock.now());
     const answers = new FormData();
     answers.set("model", "AL008");
@@ -146,7 +147,7 @@ describe("createScale and device identifiers", () => {
     async (name) => {
       const { clock, panel, connected } = connectTo(stubGatt(ACAIA_GATT));
       await connected;
-      await advanceTo(clock, SUBSCRIBE_SETTLE_MS);
+      await advanceTo(clock, INFO_WAIT_MS);
       const answers = new FormData();
       answers.set(name, "PEARLSD9F8BC");
 
@@ -163,7 +164,7 @@ describe("createScale controls", () => {
     const gatt = stubGatt(ACAIA_GATT);
     const { clock, panel, connected } = connectTo(gatt);
     await connected;
-    await advanceTo(clock, SUBSCRIBE_SETTLE_MS);
+    await advanceTo(clock, INFO_WAIT_MS);
 
     click(panel, "tare");
     await vi.advanceTimersByTimeAsync(0);
@@ -175,7 +176,7 @@ describe("createScale controls", () => {
     const gatt = stubGatt(ACAIA_GATT);
     const { clock, panel, connected } = connectTo(gatt);
     await connected;
-    await advanceTo(clock, SUBSCRIBE_SETTLE_MS);
+    await advanceTo(clock, INFO_WAIT_MS);
     const writes = writtenHex(gatt).length;
 
     click(panel, "disconnect");
@@ -193,13 +194,13 @@ describe("createScale controls", () => {
     const driver = { ...acaia, createSession: vi.fn(acaia.createSession) };
     const { clock, panel, recordingStartT, connected } = connectTo(gatt, { driver });
     await connected;
-    await advanceTo(clock, SUBSCRIBE_SETTLE_MS);
+    await advanceTo(clock, INFO_WAIT_MS);
     click(panel, "disconnect");
     await advanceTo(clock, reconnectT);
     const before = operationsOn(gatt).length;
 
     click(panel, "reconnect");
-    await advanceTo(clock, reconnectT + SUBSCRIBE_SETTLE_MS);
+    await advanceTo(clock, reconnectT + INFO_WAIT_MS);
 
     expect(operationsOn(gatt).slice(before)).toEqual([...DISCOVERY, ...HANDSHAKE]);
     expect(driver.createSession).toHaveBeenCalledTimes(2);
@@ -207,8 +208,8 @@ describe("createScale controls", () => {
     const fixture = exportFixture(panel, 2);
     expect(fixture?.header.sessionStartT).toBe(reconnectT);
     expect(fixture?.records.map(({ t, hex }) => [t, hex])).toEqual([
-      [reconnectT + SUBSCRIBE_SETTLE_MS, TX.identify],
-      [reconnectT + SUBSCRIBE_SETTLE_MS, TX.notificationRequest],
+      [reconnectT + INFO_WAIT_MS, TX.identify],
+      [reconnectT + INFO_WAIT_MS, TX.notificationRequest],
     ]);
   });
 
@@ -217,13 +218,14 @@ describe("createScale controls", () => {
     const gatt = stubGatt(ACAIA_GATT);
     const { clock, panel, connected } = connectTo(gatt);
     await connected;
-    await advanceTo(clock, 300);
-    notifyHex(gatt, RX.settings, 300);
+    const settingsT = INFO_WAIT_MS + 200;
+    await advanceTo(clock, settingsT);
+    notifyHex(gatt, RX.settings, settingsT);
     click(panel, "disconnect");
     await advanceTo(clock, reconnectT);
     click(panel, "reconnect");
-    await advanceTo(clock, reconnectT + 300);
-    notifyHex(gatt, RX.weight, reconnectT + 300);
+    await advanceTo(clock, reconnectT + settingsT);
+    notifyHex(gatt, RX.weight, reconnectT + settingsT);
 
     expect(recordingsShown(panel)).toEqual([
       { id: 1, text: "#1 session, ended, 3 packets", canDiscard: true },
@@ -238,9 +240,9 @@ describe("createScale controls", () => {
       sessionStartT: 0,
     });
     expect(first?.records.map(({ t, hex }) => [t, hex])).toEqual([
-      [SUBSCRIBE_SETTLE_MS, TX.identify],
-      [SUBSCRIBE_SETTLE_MS, TX.notificationRequest],
-      [300, RX.settings],
+      [INFO_WAIT_MS, TX.identify],
+      [INFO_WAIT_MS, TX.notificationRequest],
+      [settingsT, RX.settings],
     ]);
     const second = exportFixture(panel, 2);
     expect(second?.header.sessionStartT).toBe(reconnectT);
@@ -257,10 +259,10 @@ describe("createScale controls", () => {
   test("Discard drops an ended recording for good, but never the live one", async () => {
     const { clock, panel, connected } = connectTo(stubGatt(ACAIA_GATT));
     await connected;
-    await advanceTo(clock, SUBSCRIBE_SETTLE_MS);
+    await advanceTo(clock, INFO_WAIT_MS);
     click(panel, "disconnect");
     click(panel, "reconnect");
-    await advanceTo(clock, 2 * SUBSCRIBE_SETTLE_MS);
+    await advanceTo(clock, 2 * INFO_WAIT_MS);
     const discard = panel.onDiscard.mock.calls[0]?.[0];
 
     discard?.(2);
@@ -321,7 +323,7 @@ describe("createScale runs one connection at a time", () => {
     );
 
     click(panel, "reconnect");
-    await advanceTo(clock, RECONNECT_RETRY_MS + SUBSCRIBE_SETTLE_MS);
+    await advanceTo(clock, RECONNECT_RETRY_MS + INFO_WAIT_MS);
     await connected;
 
     expect(gatt.server.connect).toHaveBeenCalledTimes(2);

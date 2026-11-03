@@ -1,4 +1,4 @@
-import { acaia, SUBSCRIBE_SETTLE_MS } from "openpour/acaia";
+import { acaia, INFO_WAIT_MS } from "openpour/acaia";
 import { bytesToHex, hexToBytes } from "openpour/replay";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
@@ -111,7 +111,7 @@ describe("listening, then starting an Acaia session", () => {
       clock,
       onEvent: (event) => events.push(event),
     });
-    await advanceTo(clock, 3000 + SUBSCRIBE_SETTLE_MS);
+    await advanceTo(clock, 3000 + INFO_WAIT_MS);
     notify(RX.weight);
 
     const sent = fake.calls.map((call) =>

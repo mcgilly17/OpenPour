@@ -1,15 +1,33 @@
 import { OpenPourError } from "../../core/errors.js";
 import { createFlowFilter } from "../../core/flow.js";
-import type { Capabilities, Command, ScaleEvent, ScaleSession, Step } from "../../core/types.js";
+import type {
+  Capabilities,
+  Command,
+  ScaleEvent,
+  ScaleSession,
+  Step,
+  WeightUnit,
+} from "../../core/types.js";
 import { type AcaiaCommand, commands } from "./commands.js";
 import { createFrameReader, type Frame } from "./createFrameReader.js";
-import { type AcaiaRecord, decodeMessage } from "./decodeMessage.js";
+import { type AcaiaMessage, type AcaiaRecord, decodeMessage } from "./decodeMessage.js";
 import { type AcaiaVariant, normalizeUuid } from "./findVariant.js";
 
-/** A short pause after subscribing before identifying, which scales are commonly given. */
-export const SUBSCRIBE_SETTLE_MS = 100;
+/**
+ * How long after subscribing to wait for the scale to describe itself (its firmware and model
+ * code) before identifying anyway. Unidentified, the Pearl S repeats it about every 0.5 s and the
+ * Lunar about every 1.15 s; identifying stops it.
+ */
+export const INFO_WAIT_MS = 1500;
 /** No frame for this long means the scale stopped talking; reported once as a timeout error. */
 export const SILENCE_TIMEOUT_MS = 5000;
+/** How long to wait for asked-for settings before asking again. The Pearl S answers within 200 ms. */
+export const SETTINGS_REPLY_TIMEOUT_MS = 1000;
+/**
+ * The decimals each unit's weights carry on the Pearl S and the Lunar. Weights with other decimals
+ * mean the unit was switched on the scale, which sends no new settings.
+ */
+export const UNIT_DECIMALS: Readonly<Record<WeightUnit, number>> = { g: 1, oz: 3 };
 
 const NOT_IDENTIFIED_TYPE = 7;
 
@@ -21,18 +39,41 @@ const CAPABILITIES: Capabilities = {
   maxRateHz: 10,
 };
 
-type Phase = "subscribing" | "handshaking" | "ready";
+type Phase = "waitingForInfo" | "handshaking" | "ready";
+type Weight = Extract<AcaiaRecord, { kind: "weight" }>;
+
+interface Output {
+  events: ScaleEvent[];
+  commands: Command[];
+}
+
+const NOTHING: Output = { events: [], commands: [] };
+
+function only(...events: ScaleEvent[]): Output {
+  return { events, commands: [] };
+}
+
+function merge(outputs: Output[]): Output {
+  return {
+    events: outputs.flatMap((o) => o.events),
+    commands: outputs.flatMap((o) => o.commands),
+  };
+}
 
 /** One connected Acaia scale. The variant comes from the GATT layout (see `findVariant`). */
 export function createAcaiaSession(variant: AcaiaVariant): ScaleSession {
   const reader = createFrameReader();
   const flow = createFlowFilter();
   const notifyChr = normalizeUuid(variant.notifyChr);
-  let phase: Phase = "subscribing";
+  let phase: Phase = "waitingForInfo";
   let wakeAt = 0;
   let lastFrameAt = 0;
   let isSilent = false;
+  let hasReportedInfo = false;
   let isTimerRunning = false;
+  /** The unit the last settings gave; undefined before any, and while a unit switch is confirmed. */
+  let unit: WeightUnit | undefined;
+  let settingsAskedAt = 0;
 
   function write(name: AcaiaCommand): Command {
     return {
@@ -48,42 +89,83 @@ export function createAcaiaSession(variant: AcaiaVariant): ScaleSession {
     return { events, commands: cmds, wakeAt };
   }
 
-  function recordEvents(record: AcaiaRecord, t: number): ScaleEvent[] {
-    switch (record.kind) {
-      case "weight": {
-        const flowGramsPerSec = flow.push(t, record.grams);
-        // ponytail: stable is inferred from zero flow until a capture shows the scale's settled bit.
-        const reading = { t, grams: record.grams, stable: flowGramsPerSec === 0, flowGramsPerSec };
-        return [{ type: "reading", reading }];
-      }
+  /** Asks for the settings, unless an answer to the last ask is still due. */
+  function askForSettings(t: number): Command[] {
+    if (t - settingsAskedAt < SETTINGS_REPLY_TIMEOUT_MS) return [];
+    settingsAskedAt = t;
+    return [write("getSettings")];
+  }
+
+  /** No reading leaves without a unit the settings confirmed (ADR 0019). */
+  function weightOutput({ value, decimals, isStable }: Weight, t: number): Output {
+    if (unit === undefined || decimals !== UNIT_DECIMALS[unit]) {
+      unit = undefined;
+      return { events: [], commands: askForSettings(t) };
+    }
+    const flowPerSec = flow.push(t, value, unit);
+    return only({
+      type: "reading",
+      reading: { t, value, unit, decimals, stable: isStable, flowPerSec },
+    });
+  }
+
+  function recordOutput(records: AcaiaRecord[], i: number, t: number): Output {
+    const record = records[i];
+    switch (record?.kind) {
+      case "weight":
+        return weightOutput(record, t);
       case "timer":
-        return [{ type: "timer", running: isTimerRunning, ms: record.ms }];
+        return only({ type: "timer", running: isTimerRunning, ms: record.ms });
       case "battery":
-        return [{ type: "battery", percent: record.percent }];
+        return only({ type: "battery", percent: record.percent });
       case "button":
         if (record.button === "tare") flow.reset();
         if (record.button === "start") isTimerRunning = true;
         if (record.button === "stop" || record.button === "reset") isTimerRunning = false;
-        return [{ type: "button", button: record.button }];
+        return only({ type: "button", button: record.button });
+      default:
+        return NOTHING;
     }
   }
 
-  function frameEvents(frame: Frame, t: number): ScaleEvent[] {
-    const message = decodeMessage(frame);
-    if (!message) return [];
-    if (message.type === "event") return message.records.flatMap((r) => recordEvents(r, t));
-    isTimerRunning = message.settings.isTimerRunning;
-    return [{ type: "battery", percent: message.settings.batteryPercent }];
+  function messageOutput(message: AcaiaMessage | undefined, t: number): Output {
+    switch (message?.type) {
+      case "event":
+        return merge(message.records.map((_, i) => recordOutput(message.records, i, t)));
+      case "settings":
+        unit = message.settings.unit;
+        isTimerRunning = message.settings.isTimerRunning;
+        return only({ type: "battery", percent: message.settings.batteryPercent });
+      case "info":
+        if (hasReportedInfo) return NOTHING;
+        hasReportedInfo = true;
+        return only({ type: "info", ...message.info });
+      default:
+        return NOTHING;
+    }
+  }
+
+  function identify(t: number): Command[] {
+    phase = "handshaking";
+    wakeAt = t + variant.heartbeatMs;
+    return [write("identify"), write("notificationRequest")];
+  }
+
+  /** The scale sends this frame until identified: identify at once, or again. */
+  function notIdentifiedCommands(t: number): Command[] {
+    return phase === "waitingForInfo" ? identify(t) : [write("identify")];
+  }
+
+  function frameOutput(frame: Frame, t: number): Output {
+    const output = messageOutput(decodeMessage(frame), t);
+    if (frame.type !== NOT_IDENTIFIED_TYPE) return output;
+    return { ...output, commands: [...notIdentifiedCommands(t), ...output.commands] };
   }
 
   function receiveFrames(frames: Frame[], t: number): Step {
-    const events: ScaleEvent[] = [];
-    const cmds: Command[] = [];
-    for (const frame of frames) {
-      if (frame.type === NOT_IDENTIFIED_TYPE) cmds.push(write("identify"));
-      events.push(...frameEvents(frame, t));
-    }
-    if (events.length > 0 && phase === "handshaking") {
+    const { events, commands: cmds } = merge(frames.map((frame) => frameOutput(frame, t)));
+    // The scale describing itself isn't data yet; anything else after identifying is.
+    if (phase === "handshaking" && events.some((e) => e.type !== "info")) {
       phase = "ready";
       events.unshift({ type: "state", state: "ready" });
     }
@@ -95,12 +177,6 @@ export function createAcaiaSession(variant: AcaiaVariant): ScaleSession {
     isSilent = true;
     const error = new OpenPourError("timeout", `no data from the scale for ${t - lastFrameAt} ms`);
     return [{ type: "error", error }];
-  }
-
-  function identify(t: number): Step {
-    phase = "handshaking";
-    wakeAt = t + variant.heartbeatMs;
-    return step([], [write("identify"), write("notificationRequest")]);
   }
 
   // Scales may drop the notification request, so it rides along with every heartbeat.
@@ -120,7 +196,8 @@ export function createAcaiaSession(variant: AcaiaVariant): ScaleSession {
     capabilities: CAPABILITIES,
     start(t) {
       lastFrameAt = t;
-      wakeAt = t + SUBSCRIBE_SETTLE_MS;
+      settingsAskedAt = t;
+      wakeAt = t + INFO_WAIT_MS;
       const subscribe: Command = { type: "subscribe", svc: variant.svc, chr: variant.notifyChr };
       return step([{ type: "state", state: "handshaking" }], [subscribe]);
     },
@@ -135,7 +212,7 @@ export function createAcaiaSession(variant: AcaiaVariant): ScaleSession {
     },
     tick(t) {
       if (t < wakeAt) return step([]);
-      return phase === "subscribing" ? identify(t) : heartbeat(t);
+      return phase === "waitingForInfo" ? step([], identify(t)) : heartbeat(t);
     },
     tare() {
       flow.reset();

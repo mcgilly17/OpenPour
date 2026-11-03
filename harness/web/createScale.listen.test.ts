@@ -1,4 +1,4 @@
-import { acaia, NEW_STYLE_HEARTBEAT_MS, SUBSCRIBE_SETTLE_MS } from "openpour/acaia";
+import { acaia, INFO_WAIT_MS, NEW_STYLE_HEARTBEAT_MS } from "openpour/acaia";
 import { compareWrites, replay } from "openpour/replay";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
@@ -82,8 +82,9 @@ describe("createScale listen-only", () => {
     await advanceTo(clock, START_T);
 
     click(panel, "startSession");
-    await advanceTo(clock, START_T + SUBSCRIBE_SETTLE_MS);
-    notifyHex(gatt, RX.weight, START_T + SUBSCRIBE_SETTLE_MS);
+    await advanceTo(clock, START_T + INFO_WAIT_MS);
+    notifyHex(gatt, RX.settings, START_T + INFO_WAIT_MS);
+    notifyHex(gatt, RX.weight, START_T + INFO_WAIT_MS);
 
     expect(characteristicOf(gatt, ACAIA_NOTIFY).startNotifications).toHaveBeenCalledOnce();
     expect(writtenHex(gatt)).toEqual([TX.identify, TX.notificationRequest]);
@@ -91,6 +92,7 @@ describe("createScale listen-only", () => {
       [1, "rx", TYPE_7],
       [2, "tx", TX.identify],
       [2, "tx", TX.notificationRequest],
+      [2, "rx", RX.settings],
       [2, "rx", RX.weight],
     ]);
     expect(shown(panel, "weight").at(-1)).toContain("175.9 g");
@@ -114,7 +116,7 @@ describe("createScale listen-only", () => {
 
     expect(listened?.records.map(({ hex }) => hex)).toEqual([TYPE_7]);
     expect(session?.header.sessionStartT).toBe(START_T);
-    expect(session?.records[0]?.t).toBe(START_T + SUBSCRIBE_SETTLE_MS);
+    expect(session?.records[0]?.t).toBe(START_T + INFO_WAIT_MS);
     if (!session) throw new Error("no session fixture");
     const { expected, produced } = compareWrites(
       replay(acaia.createSession(ACAIA_GATT), session),

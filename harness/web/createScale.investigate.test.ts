@@ -1,3 +1,4 @@
+import { INFO_WAIT_MS } from "openpour/acaia";
 import { bytesToHex } from "openpour/replay";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
@@ -9,6 +10,7 @@ import {
   type InvestigateAction,
   type InvestigationState,
   NOT_FOUND,
+  WIZARD_SETTLE_MS,
 } from "./createInvestigation.js";
 import { WIZARD_READY_TIMEOUT_MS } from "./createScale.js";
 import { downloadText } from "./downloadText.js";
@@ -34,21 +36,21 @@ const SAVED: SavedScale = {
   modelYear: "2021",
   firmware: "2.6",
 };
-/** Long enough for a step: connect, get ready, ask, settle, export. */
-const STEP_MS = 3000;
+/** Long enough for a step: connect, identify once no description came, ask, settle, export. */
+const STEP_MS = INFO_WAIT_MS + WIZARD_SETTLE_MS + 500;
 
 /** The settings frame with sound at byte 9, as the scale splits it. */
 const settingsFrame = (sound: string): string => `efdd08095d02020100${sound}01000d60`;
 
-/** Makes `gatt` answer like a scale: a weight frame after identify, settings when asked. */
+/** Makes `gatt` answer like a scale: its settings after identify and when asked, then weights. */
 function answerLikeAScale(gatt: StubGatt, clock: Clock, sound: () => string): void {
   const respond = async (value: BufferSource): Promise<void> => {
     const hex = bytesToHex(value as Uint8Array);
-    if (hex === TX.identify) notifyHex(gatt, RX.weight, clock.now());
-    if (hex !== TX.getSettings) return;
+    if (hex !== TX.identify && hex !== TX.getSettings) return;
     const frame = settingsFrame(sound());
     notifyHex(gatt, frame.slice(0, 4), clock.now());
     notifyHex(gatt, frame.slice(4), clock.now());
+    notifyHex(gatt, RX.weight, clock.now());
   };
   const write = characteristicOf(gatt, ACAIA_WRITE);
   write.writeValueWithoutResponse.mockImplementation(respond);

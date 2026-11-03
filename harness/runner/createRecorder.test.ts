@@ -1,4 +1,4 @@
-import { acaia, NEW_STYLE_HEARTBEAT_MS, SUBSCRIBE_SETTLE_MS } from "openpour/acaia";
+import { acaia, INFO_WAIT_MS, NEW_STYLE_HEARTBEAT_MS } from "openpour/acaia";
 import {
   bytesToHex,
   type FixtureRecord,
@@ -112,8 +112,9 @@ describe("createRecorder", () => {
       },
     });
     const traffic: [number, string][] = [
-      [300, RX.weight],
-      [450, RX.settings],
+      // Settings first: the session reports no weight before they give its unit.
+      [300, RX.settings],
+      [450, RX.weight],
       [700, RX.buttonStart],
       [1200, RX.timer],
       [1500, RX.ackWithNegativeWeight],
@@ -131,7 +132,8 @@ describe("createRecorder", () => {
 
     const records = (dir: string) => fixture.records.filter((r) => r.dir === dir);
     expect(records("rx").map(({ t, hex }) => [t, hex])).toEqual(traffic);
-    expect(records("tx").map(({ t }) => t)).toEqual([100, 100, 1100, 1100, 2100, 2100]);
+    const beat = INFO_WAIT_MS + NEW_STYLE_HEARTBEAT_MS;
+    expect(records("tx").map(({ t }) => t)).toEqual([INFO_WAIT_MS, INFO_WAIT_MS, beat, beat]);
     const decoded = (events: TimedEvent[]) => events.filter(({ event }) => DECODED.has(event.type));
     expect(decoded(live)).toHaveLength(12);
     expect(decoded(replayed.events)).toEqual(decoded(live));
@@ -156,8 +158,9 @@ describe("createRecorder", () => {
       },
     });
     const traffic: [number, string][] = [
-      [300, RX.weight],
-      [450, RX.settings],
+      // Settings first: the session reports no weight before they give its unit.
+      [300, RX.settings],
+      [450, RX.weight],
       [700, RX.buttonStart],
       [1500, RX.timer],
       [1800, RX.weight.slice(0, 16)],
@@ -170,7 +173,7 @@ describe("createRecorder", () => {
       source.notify(ACAIA_SVC, ACAIA_NOTIFY, hexToBytes(hex));
     }
     // End the recording on a heartbeat, which replay must still produce.
-    await advanceTo(clock, sessionStartT + SUBSCRIBE_SETTLE_MS + 4 * NEW_STYLE_HEARTBEAT_MS);
+    await advanceTo(clock, sessionStartT + INFO_WAIT_MS + 4 * NEW_STYLE_HEARTBEAT_MS);
 
     const fixture = parseFixture(recorder.export(DETAILS).jsonl);
     const replayed = replay(acaia.createSession(ACAIA_GATT), fixture);

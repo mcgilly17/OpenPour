@@ -1,5 +1,5 @@
 import type { Command, ScaleSession, Step } from "openpour";
-import { acaia, SUBSCRIBE_SETTLE_MS } from "openpour/acaia";
+import { acaia, INFO_WAIT_MS, NEW_STYLE_HEARTBEAT_MS } from "openpour/acaia";
 import { bytesToHex, hexToBytes, parseFixture } from "openpour/replay";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
@@ -87,7 +87,8 @@ describe("startRunner commands", () => {
   });
 
   test("holds the Acaia handshake until a slow subscription completes", async () => {
-    const subscribeMs = SUBSCRIBE_SETTLE_MS * 5;
+    // Past the identify the session times for itself, but before its first heartbeat.
+    const subscribeMs = INFO_WAIT_MS + NEW_STYLE_HEARTBEAT_MS / 2;
     const { clock, source } = run(acaia.createSession(ACAIA_GATT), (call) =>
       call.type === "subscribe" ? { delayMs: subscribeMs } : {},
     );
@@ -374,12 +375,12 @@ describe("two runners side by side", () => {
         if (event.type === "packet") recorder.add(event.packet);
       },
     });
-    const grams = () =>
+    const values = () =>
       events.flatMap((e) =>
-        e.type === "scale" && e.event.type === "reading" ? [e.event.reading.grams] : [],
+        e.type === "scale" && e.event.type === "reading" ? [e.event.reading.value] : [],
       );
     const notify = (hex: string) => source.notify(ACAIA_SVC, ACAIA_NOTIFY, hexToBytes(hex));
-    return { source, recorder, events, runner, grams, notify };
+    return { source, recorder, events, runner, values, notify };
   }
 
   function receivedHex(jsonl: string): string[] {
@@ -390,23 +391,25 @@ describe("two runners side by side", () => {
     const clock = useFakeClock();
     const a = connect(clock, "a");
     const b = connect(clock, "b");
-    await advanceTo(clock, 200);
+    const identified = INFO_WAIT_MS;
+    await advanceTo(clock, identified);
+    for (const scale of [a, b]) scale.notify(RX.settings);
 
     a.runner.tare();
     a.notify(RX.weight);
     b.notify(RX.ackWithNegativeWeight);
-    await advanceTo(clock, 500);
+    await advanceTo(clock, identified + 300);
     a.source.drop();
-    await advanceTo(clock, 2500);
+    await advanceTo(clock, identified + 2300);
     b.notify(RX.weight);
 
     const handshake = ["subscribe", TX.identify, TX.notificationRequest];
     const heartbeat = [TX.heartbeat, TX.notificationRequest];
     expect(sent(a.source)).toEqual([...handshake, TX.tare]);
     expect(sent(b.source)).toEqual([...handshake, ...heartbeat, ...heartbeat]);
-    expect(a.grams()).toEqual([175.9]);
-    expect(b.grams()).toEqual([-598, 175.9]);
-    expect(a.events.at(-1)).toEqual({ type: "disconnected", t: 500 });
+    expect(a.values()).toEqual([175.9]);
+    expect(b.values()).toEqual([-598, 175.9]);
+    expect(a.events.at(-1)).toEqual({ type: "disconnected", t: identified + 300 });
     expect(b.events.some(({ type }) => type === "disconnected")).toBe(false);
 
     const details = {
@@ -423,7 +426,7 @@ describe("two runners side by side", () => {
       "Lunar_fwunknown_two-scales-a.jsonl",
       "Lunar_fwunknown_two-scales-b.jsonl",
     ]);
-    expect(receivedHex(fileA.jsonl)).toEqual([RX.weight]);
-    expect(receivedHex(fileB.jsonl)).toEqual([RX.ackWithNegativeWeight, RX.weight]);
+    expect(receivedHex(fileA.jsonl)).toEqual([RX.settings, RX.weight]);
+    expect(receivedHex(fileB.jsonl)).toEqual([RX.settings, RX.ackWithNegativeWeight, RX.weight]);
   });
 });

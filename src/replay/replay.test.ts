@@ -32,6 +32,8 @@ function tx(t: number, hex: string): FixtureRecord {
   return { t, dir: "tx", svc: "s", chr: "w", hex };
 }
 
+const STILL_GRAMS = { unit: "g", decimals: 0, stable: true, flowPerSec: 0 } as const;
+
 /** Subscribes on start, reports each packet's first byte as grams, and heartbeats every second. */
 function fakeSession(
   nextWake: (t: number) => number | undefined = (t) => t + HEARTBEAT_MS,
@@ -54,9 +56,7 @@ function fakeSession(
       wakeAt: t + HEARTBEAT_MS,
     }),
     receive: (_chr, bytes, t) => ({
-      events: [
-        { type: "reading", reading: { t, grams: bytes[0] ?? 0, stable: true, flowGramsPerSec: 0 } },
-      ],
+      events: [{ type: "reading", reading: { t, value: bytes[0] ?? 0, ...STILL_GRAMS } }],
       commands: [],
       wakeAt: Math.ceil(t / HEARTBEAT_MS) * HEARTBEAT_MS || HEARTBEAT_MS,
     }),
@@ -77,14 +77,14 @@ describe("replay", () => {
         t: 100,
         event: {
           type: "reading",
-          reading: { t: 100, grams: 0x12, stable: true, flowGramsPerSec: 0 },
+          reading: { t: 100, value: 0x12, ...STILL_GRAMS },
         },
       },
       {
         t: 250,
         event: {
           type: "reading",
-          reading: { t: 250, grams: 0x13, stable: true, flowGramsPerSec: 0 },
+          reading: { t: 250, value: 0x13, ...STILL_GRAMS },
         },
       },
     ]);
