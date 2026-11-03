@@ -278,8 +278,13 @@ Lunar (2021 per its owner, firmware 1.0.019 A). These are observations, not veri
     captures 38.8 s apart read 111, 92 and 67, a steady 1.13 per second (about
     0.88 s per step, not seconds), and it reads `00` again once touch returns.
 
-  Auto connect and bytes 2, 3 and 7 (`01` each: mode, auto-off and the byte
-  other sources call resolution) are not otherwise tested.
+  - auto-off 5 min → 10 min flipped only the fourth byte, `01` → `02`: the
+    same list position as the Pearl S (Never, 5, 10, 20, 30, 60 min), with
+    the other values assumed from it.
+
+  Auto connect is the app's own setting (it changed nothing on the Pearl S).
+  Bytes 2 and 6 (`01` each: mode and the byte other sources call resolution)
+  are not otherwise tested.
 - **Pearl S settings frame** (`EF DD 08`, length `1F`, then 30 setting bytes),
   answering the settings request within about 100 ms:
   `64 00 02 02 02 00 00 01 01 01 01 00 00 00 00 01 00 FF 02 02 00 03 3C 00 2C 01 84 03 01 01`.
