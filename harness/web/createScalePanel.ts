@@ -4,10 +4,14 @@ import {
   type KnownCommand,
 } from "./commandAvailability.js";
 import type { PacketRun } from "./comparePackets.js";
+import {
+  EMPTY_INVESTIGATION,
+  type InvestigateAction,
+  type InvestigationState,
+} from "./createInvestigation.js";
 import { addErrorLine, type ErrorLine } from "./errorLines.js";
 import type { LogEntry } from "./LogEntry.js";
 import type { DeviceInfoField } from "./readDeviceInfo.js";
-import { EMPTY_SWEEP, type Sweep, type SweepAction } from "./settingsSweep.js";
 
 export type ConnectionState =
   | "connecting"
@@ -68,9 +72,9 @@ export interface ScalePanel {
   onDiscard(handler: (recording: number) => void): void;
   /** Answers the compare view's "find earlier" with runs from the scale's kept recordings. */
   onFindEarlier(handler: FindEarlier): void;
-  showSweep(sweep: Sweep): void;
-  /** Gets the settings sweep's clicks. */
-  onSweep(handler: (action: SweepAction) => void): void;
+  showInvestigation(investigation: InvestigationState): void;
+  /** Gets the "Investigate a setting" wizard's clicks. */
+  onInvestigate(handler: (action: InvestigateAction) => void): void;
 }
 
 /** A log entry with a key that stays the same as older rows drop off. */
@@ -89,7 +93,7 @@ export interface PanelState {
   recordings: readonly RecordingSummary[];
   log: readonly LogRow[];
   errors: readonly ErrorLine[];
-  sweep: Sweep;
+  investigation: InvestigationState;
 }
 
 /**
@@ -103,7 +107,7 @@ export interface ScalePanelStore extends ScalePanel {
   exportFixture(answers: FormData): void;
   discard(recording: number): void;
   findEarlier: FindEarlier;
-  changeSweep(action: SweepAction): void;
+  investigate(action: InvestigateAction): void;
 }
 
 export function createScalePanel(): ScalePanelStore {
@@ -121,7 +125,7 @@ export function createScalePanel(): ScalePanelStore {
     recordings: [],
     log: [],
     errors: [],
-    sweep: EMPTY_SWEEP,
+    investigation: EMPTY_INVESTIGATION,
   };
   let nextRowId = 0;
   const listeners = new Set<() => void>();
@@ -129,7 +133,7 @@ export function createScalePanel(): ScalePanelStore {
   let onExport: (answers: FormData) => void = () => {};
   let onDiscard: (recording: number) => void = () => {};
   let onFindEarlier: FindEarlier = () => [];
-  let onSweep: (action: SweepAction) => void = () => {};
+  let onInvestigate: (action: InvestigateAction) => void = () => {};
 
   function update(change: Partial<PanelState>): void {
     state = { ...state, ...change };
@@ -167,9 +171,9 @@ export function createScalePanel(): ScalePanelStore {
     onFindEarlier(handler) {
       onFindEarlier = handler;
     },
-    showSweep: (sweep) => update({ sweep }),
-    onSweep(handler) {
-      onSweep = handler;
+    showInvestigation: (investigation) => update({ investigation }),
+    onInvestigate(handler) {
+      onInvestigate = handler;
     },
     subscribe(listener) {
       listeners.add(listener);
@@ -182,6 +186,6 @@ export function createScalePanel(): ScalePanelStore {
     exportFixture: (answers) => onExport(answers),
     discard: (recording) => onDiscard(recording),
     findEarlier: (run, prefixBytes) => onFindEarlier(run, prefixBytes),
-    changeSweep: (action) => onSweep(action),
+    investigate: (action) => onInvestigate(action),
   };
 }

@@ -19,7 +19,7 @@ export function stubPanel(): StubPanel {
     onExport: vi.fn<ScalePanel["onExport"]>(),
     onDiscard: vi.fn<ScalePanel["onDiscard"]>(),
     onFindEarlier: vi.fn<ScalePanel["onFindEarlier"]>(),
-    showSweep: vi.fn<ScalePanel["showSweep"]>(),
-    onSweep: vi.fn<ScalePanel["onSweep"]>(),
+    showInvestigation: vi.fn<ScalePanel["showInvestigation"]>(),
+    onInvestigate: vi.fn<ScalePanel["onInvestigate"]>(),
   };
 }

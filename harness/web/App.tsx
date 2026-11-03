@@ -93,6 +93,7 @@ export function App({ supportProblem }: { supportProblem: string | undefined }):
                 <ScaleCard
                   key={label}
                   panel={panel}
+                  name={name}
                   saved={savedFor(device)}
                   onSave={(details) => save({ ...details, id: device.id, name })}
                 />

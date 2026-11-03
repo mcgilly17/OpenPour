@@ -5,6 +5,7 @@ import { type Packet, type Runner, type RunnerEvent, startRunner } from "../runn
 import { type Characteristic, subscriptionsOnStart } from "../runner/subscriptionsOnStart.js";
 import { matchedPrefix } from "./chooseScale.js";
 import { commandAvailability, KNOWN_COMMANDS, type KnownCommand } from "./commandAvailability.js";
+import { createInvestigation, type InvestigatedScale } from "./createInvestigation.js";
 import {
   createRecordings,
   describeRecording,
@@ -20,20 +21,16 @@ import {
 import { createWebBluetoothSource } from "./createWebBluetoothSource.js";
 import { downloadText } from "./downloadText.js";
 import { describeError, explainConnectFailure } from "./explainFailure.js";
-import { findEarlierRuns, findRuns, patternOf } from "./findEarlierRuns.js";
+import { findEarlierRuns } from "./findEarlierRuns.js";
 import { fixtureDetails } from "./fixtureDetails.js";
 import { type OpenedSession, openSession } from "./openSession.js";
 import { retryWhileOutOfRange } from "./retryWhileOutOfRange.js";
-import {
-  EMPTY_SWEEP,
-  NO_MATCHING_FRAME,
-  type Sweep,
-  type SweepAction,
-  sweepDetail,
-  sweepFile,
-} from "./settingsSweep.js";
 import { showDeviceInfo } from "./showDeviceInfo.js";
 import { describeCapabilities, describeInfo, showRunnerEvent } from "./showRunnerEvent.js";
+import { withTimeout } from "./withTimeout.js";
+
+/** How long a wizard step waits, once connected, for the session to report ready. */
+export const WIZARD_READY_TIMEOUT_MS = 5000;
 
 export interface ScaleOptions {
   device: BluetoothDevice;
@@ -60,6 +57,9 @@ interface Connection {
   recording: Recording;
   runner: Runner | undefined;
   isClosed: boolean;
+  /** Resolves to true once the session reports ready, or false if the connection closes first. */
+  ready: Promise<boolean>;
+  settleReady(isReady: boolean): void;
 }
 
 /** A connection attempt in flight, which may be waiting for the scale to advertise. */
@@ -98,7 +98,6 @@ export function publicName(driver: Driver, name: string | undefined): string {
 export function createScale(options: ScaleOptions): Scale {
   const { device, label, driver, clock, recordingStartT, panel } = options;
   const recordings = createRecordings({ label, recordingStartT });
-  let sweep: Sweep = EMPTY_SWEEP;
   let connection: Connection | undefined;
   let attempt: Attempt | undefined;
 
@@ -154,6 +153,7 @@ export function createScale(options: ScaleOptions): Scale {
   function closed(conn: Connection, t: number): void {
     if (conn.isClosed) return;
     conn.isClosed = true;
+    conn.settleReady(false);
     conn.recording.isLive = false;
     mark(conn.recording, t, "disconnected");
     showRunnerEvent(panel, { type: "disconnected", t });
@@ -175,6 +175,7 @@ export function createScale(options: ScaleOptions): Scale {
         closed(conn, event.t);
         break;
       case "scale":
+        if (event.event.type === "state" && event.event.state === "ready") conn.settleReady(true);
         panel.log({ kind: "event", t: event.t - recording.startT, event: event.event });
         showRunnerEvent(panel, event);
         break;
@@ -246,12 +247,18 @@ export function createScale(options: ScaleOptions): Scale {
     showDeviceInfo(panel, opened.deviceInfo);
     const { server, characteristics } = opened;
     const web = createWebBluetoothSource({ server, characteristics, clock });
+    let settleReady: (isReady: boolean) => void = () => {};
+    const ready = new Promise<boolean>((resolve) => {
+      settleReady = resolve;
+    });
     const conn: Connection = {
       opened,
       source: createListeningSource(web, clock),
       recording: startRecording(mode === "listen" ? "listen-only" : "session", opened),
       runner: undefined,
       isClosed: false,
+      ready,
+      settleReady,
     };
     conn.source.onDisconnect(() => closed(conn, clock.now()));
     connection = conn;
@@ -304,9 +311,17 @@ export function createScale(options: ScaleOptions): Scale {
     }
   }
 
-  function disconnect(): void {
-    if (!connection) return;
-    void (connection.runner ?? connection.source).disconnect();
+  async function disconnect(): Promise<void> {
+    if (isOpen(connection)) await (connection.runner ?? connection.source).disconnect();
+  }
+
+  /** Connects as Reconnect does, then waits for the session to report ready. */
+  async function connectReady(): Promise<boolean> {
+    await connect("session");
+    const conn = connection;
+    if (!isOpen(conn)) return false;
+    const getReady = withTimeout(clock, "getting ready", conn.ready, WIZARD_READY_TIMEOUT_MS);
+    return getReady.catch(() => false);
   }
 
   function send(command: KnownCommand): void {
@@ -338,57 +353,6 @@ export function createScale(options: ScaleOptions): Scale {
     }
   }
 
-  /** Replaces part of the sweep and shows it; a change without a problem clears the last one. */
-  function showSweep(change: Partial<Sweep>): void {
-    sweep = { ...sweep, problem: undefined, ...change };
-    panel.showSweep(sweep);
-  }
-
-  /** Adds the latest recording's newest tracked frame, exporting that recording as the evidence. */
-  function capture(setting: string, value: string, answers: FormData): void {
-    const recording = recordings.all().at(-1);
-    const searched = recording && [{ id: recording.id, records: recording.recorder.records() }];
-    const run = searched && sweep.tracked && findRuns(searched, sweep.tracked)[0];
-    if (!recording || !run) {
-      showSweep({ problem: NO_MATCHING_FRAME });
-      return;
-    }
-    answers.set("scenarioDetail", sweepDetail(setting, value));
-    try {
-      const fixtureFile = exportRecording(recording, answers);
-      showSweep({ rows: [...sweep.rows, { setting, value, run, fixtureFile }] });
-    } catch (error) {
-      showSweep({ problem: `Not captured: ${describeError(error)}` });
-    }
-  }
-
-  function exportSweep(answers: FormData): void {
-    try {
-      const details = fixtureDetails(answers, publicName(driver, device.name));
-      const { fileName, json } = sweepFile(sweep, details, new Date().toISOString());
-      downloadText(fileName, json);
-      showSweep({});
-    } catch (error) {
-      showSweep({ problem: `Export failed: ${describeError(error)}` });
-    }
-  }
-
-  function changeSweep(action: SweepAction): void {
-    switch (action.type) {
-      case "track":
-        showSweep({ tracked: patternOf(action.run, action.prefixBytes) });
-        break;
-      case "capture":
-        capture(action.setting.trim(), action.value.trim(), action.answers);
-        break;
-      case "remove":
-        showSweep({ rows: sweep.rows.toSpliced(action.index, 1) });
-        break;
-      case "export":
-        exportSweep(action.answers);
-    }
-  }
-
   function discard(id: number): void {
     if (!recordings.discard(id)) panel.addError(`Recording #${id} is live: disconnect first.`);
     showRecordings();
@@ -398,7 +362,7 @@ export function createScale(options: ScaleOptions): Scale {
   panel.setCommands(availability());
   panel.setControls(controls());
   for (const command of KNOWN_COMMANDS) panel.onAction(command, () => send(command));
-  panel.onAction("disconnect", disconnect);
+  panel.onAction("disconnect", () => void disconnect());
   panel.onAction("reconnect", () => void connect("session"));
   panel.onAction("listen", () => void connect("listen"));
   panel.onAction("startSession", startSession);
@@ -411,6 +375,20 @@ export function createScale(options: ScaleOptions): Scale {
       .map(({ id, recorder }) => ({ id, records: recorder.records() }));
     return findEarlierRuns(searched, run, prefixBytes);
   });
-  panel.onSweep(changeSweep);
+  const investigated: InvestigatedScale = {
+    name: publicName(driver, device.name),
+    disconnect,
+    connectReady,
+    send,
+    wait: (delayMs) => new Promise((resolve) => clock.schedule(resolve, delayMs)),
+    latestRecords: () => recordings.all().at(-1)?.recorder.records() ?? [],
+    exportLatest(answers) {
+      const recording = recordings.all().at(-1);
+      if (!recording) throw new Error("no recording yet");
+      return exportRecording(recording, answers);
+    },
+  };
+  const investigate = createInvestigation(investigated, (state) => panel.showInvestigation(state));
+  panel.onInvestigate((action) => void investigate(action));
   return { connect };
 }

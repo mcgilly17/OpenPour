@@ -77,7 +77,7 @@ export interface RecordingsSectionProps extends RecordingRowsProps {
   onExport(answers: FormData): void;
   /** Where model, model year and firmware start: the saved scale's, still editable. */
   defaults?: ScaleDetails | undefined;
-  /** The export form, whose current answers the settings sweep exports with. */
+  /** The export form, whose current answers a setting investigation exports with. */
   formRef?: Ref<HTMLFormElement>;
 }
 

@@ -3,10 +3,10 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
 import { TooltipProvider } from "./components/ui/tooltip.js";
+import { EMPTY_INVESTIGATION, type InvestigateAction } from "./createInvestigation.js";
 import { createScalePanel } from "./createScalePanel.js";
 import { ScaleCard } from "./ScaleCard.js";
 import type { SavedScale } from "./savedScales.js";
-import { EMPTY_SWEEP, type SweepAction } from "./settingsSweep.js";
 
 afterEach(cleanup);
 
@@ -19,38 +19,60 @@ const SAVED: SavedScale = {
   firmware: "1.0.016",
 };
 
-/** Captures "sound" "off" after typing `model` into the export form; returns the answers sent. */
-function captureWithModel(model: string, saved?: SavedScale): FormData | undefined {
+/** Shows step 2 of Sound's investigation, after "on" was captured. */
+function renderStep(saved?: SavedScale) {
   const panel = createScalePanel();
-  const onSweep = vi.fn<(action: SweepAction) => void>();
-  panel.onSweep(onSweep);
-  panel.showSweep({ ...EMPTY_SWEEP, tracked: { svc: "s", chr: "n", prefix: [0xef], length: 3 } });
+  const onInvestigate = vi.fn<(action: InvestigateAction) => void>();
+  panel.onInvestigate(onInvestigate);
+  const capture = { option: "on", fixtureFile: "on.jsonl", frames: {} };
+  const run = {
+    setting: "Sound",
+    options: ["on", "off"],
+    command: "battery" as const,
+    plan: ["on", "off", "on"],
+    captures: [capture],
+  };
+  panel.showInvestigation({
+    ...EMPTY_INVESTIGATION,
+    screen: { stage: "step", run, status: "waiting" },
+  });
   render(
     <TooltipProvider>
-      <ScaleCard panel={panel} saved={saved} onSave={() => undefined} />
+      <ScaleCard panel={panel} name="Acaia LUNAR" saved={saved} onSave={() => undefined} />
     </TooltipProvider>,
   );
-
-  fireEvent.change(screen.getByLabelText("Model"), { target: { value: model } });
-  fireEvent.change(screen.getByLabelText("Setting"), { target: { value: "sound" } });
-  fireEvent.change(screen.getByLabelText("Value"), { target: { value: "off" } });
-  fireEvent.click(screen.getByRole("button", { name: "Capture" }));
-
-  const action = onSweep.mock.calls[0]?.[0];
-  expect(action).toMatchObject({ type: "capture", setting: "sound", value: "off" });
-  return action?.type === "capture" ? action.answers : undefined;
+  return onInvestigate;
 }
 
-describe("ScaleCard settings sweep", () => {
-  test("a capture exports with the export form's current answers and the sweep's scenario", () => {
-    const answers = captureWithModel("AL008");
+/** Types `model` into the export form, then presses Done; returns the answers the step got. */
+function readWithModel(model: string, saved?: SavedScale): FormData | undefined {
+  const onInvestigate = renderStep(saved);
+  fireEvent.change(screen.getByLabelText("Model"), { target: { value: model } });
 
-    expect(answers?.get("model")).toBe("AL008");
-    expect(answers?.get("scenario")).toBe("settings-change");
+  fireEvent.click(screen.getByRole("button", { name: "Done, read the scale" }));
+
+  const action = onInvestigate.mock.calls[0]?.[0];
+  return action?.type === "read" ? action.answers : undefined;
+}
+
+describe("ScaleCard investigating a setting", () => {
+  test("a step says what to set in the vendor app, and what the last step captured", () => {
+    renderStep();
+
+    expect(screen.getByText("Sound = on captured")).toBeTruthy();
+    const instruction = screen.getByText(/^Step 2 of 3/);
+    expect(instruction.textContent).toBe(
+      "Step 2 of 3 — In the vendor app, set Sound → off, then close the app.",
+    );
+    expect(instruction.querySelector("strong")?.textContent).toBe("Sound → off");
+  });
+
+  test("Done reads the scale with the export form's current answers", () => {
+    expect(readWithModel("AL008")?.get("model")).toBe("AL008");
   });
 
   test("a saved scale's details win over the export form's, and nothing else of it is sent", () => {
-    const answers = captureWithModel("typed for one export", SAVED);
+    const answers = readWithModel("typed for one export", SAVED);
 
     expect(answers?.get("model")).toBe("AL008");
     expect(JSON.stringify([...(answers?.entries() ?? [])])).not.toMatch(/Xq7Lm|Kitchen/);

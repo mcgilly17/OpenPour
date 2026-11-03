@@ -7,6 +7,7 @@ import { Alert, AlertDescription } from "./components/ui/alert.js";
 import { Button } from "./components/ui/button.js";
 import { Card, CardContent } from "./components/ui/card.js";
 import { EMPTY_FIELD, type ScalePanelStore } from "./createScalePanel.js";
+import { InvestigateSection } from "./InvestigateSection.js";
 import { LogTable } from "./LogTable.js";
 import type { MarkSlot, Marks } from "./Marks.js";
 import { NotesList } from "./NotesList.js";
@@ -14,9 +15,7 @@ import { Readouts } from "./Readouts.js";
 import { RecordingsSection } from "./RecordingsSection.js";
 import { SavedScaleForm } from "./SavedScaleForm.js";
 import { ScaleHeader } from "./ScaleHeader.js";
-import { SweepSection } from "./SweepSection.js";
-import type { SavedScale, SavedScaleDetails } from "./savedScales.js";
-import { sweepAnswers } from "./settingsSweep.js";
+import { type SavedScale, type SavedScaleDetails, withSavedDetails } from "./savedScales.js";
 
 function ListenWarning(): JSX.Element {
   return (
@@ -32,6 +31,8 @@ function ListenWarning(): JSX.Element {
 
 export interface ScaleCardProps {
   panel: ScalePanelStore;
+  /** The brand and matched name prefix, e.g. "Acaia PEARL". */
+  name: string;
   /** This scale's saved details, if it is saved. */
   saved: SavedScale | undefined;
   /** Saves this scale's details; returns why they weren't saved, or undefined. */
@@ -39,8 +40,8 @@ export interface ScaleCardProps {
 }
 
 /** One scale's card, rendered from its panel store. */
-export function ScaleCard({ panel, saved, onSave }: ScaleCardProps): JSX.Element {
-  const { fields, connection, controls, commands, recordings, log, errors, sweep } =
+export function ScaleCard({ panel, name, saved, onSave }: ScaleCardProps): JSX.Element {
+  const { fields, connection, controls, commands, recordings, log, errors, investigation } =
     useSyncExternalStore(panel.subscribe, panel.getSnapshot);
   const exportForm = useRef<HTMLFormElement>(null);
   const [marks, setMarks] = useState<Marks>({});
@@ -71,6 +72,14 @@ export function ScaleCard({ panel, saved, onSave }: ScaleCardProps): JSX.Element
         {connection === "listening" && <ListenWarning />}
         <Readouts fields={fields} />
         <CommandBar availability={commands} onCommand={panel.act} />
+        <InvestigateSection
+          investigation={investigation}
+          canStart={connection === "connected"}
+          name={name}
+          commands={commands}
+          answers={() => withSavedDetails(new FormData(exportForm.current ?? undefined), saved)}
+          onInvestigate={panel.investigate}
+        />
         <NotesList lines={errors} />
         <RecordingsSection
           recordings={recordings}
@@ -81,13 +90,6 @@ export function ScaleCard({ panel, saved, onSave }: ScaleCardProps): JSX.Element
         />
         <LogTable rows={log} marks={marks} onMark={mark} />
         <ComparePanel marks={marks} onMark={mark} findEarlier={panel.findEarlier} />
-        <SweepSection
-          sweep={sweep}
-          markA={marks.A}
-          answers={() => sweepAnswers(new FormData(exportForm.current ?? undefined), saved)}
-          onSweep={panel.changeSweep}
-          onMark={mark}
-        />
       </CardContent>
     </Card>
   );

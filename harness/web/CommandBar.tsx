@@ -8,7 +8,7 @@ import { Button } from "./components/ui/button.js";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./components/ui/tooltip.js";
 import { Section } from "./Section.js";
 
-const COMMAND_LABELS: Record<KnownCommand, string> = {
+export const COMMAND_LABELS: Record<KnownCommand, string> = {
   tare: "Tare",
   timerStart: "Start timer",
   timerStop: "Stop timer",

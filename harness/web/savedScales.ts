@@ -85,6 +85,17 @@ export function saveScale(
   return write(storage, at === -1 ? [...scales, scale] : scales.with(at, scale));
 }
 
+/** The export form's `answers` with the saved scale's details over them, as an investigation exports. */
+export function withSavedDetails(
+  answers: FormData,
+  saved: SavedScaleDetails | undefined,
+): FormData {
+  if (saved) {
+    for (const name of ["model", "modelYear", "firmware"] as const) answers.set(name, saved[name]);
+  }
+  return answers;
+}
+
 export function removeSavedScale(
   storage: ScaleStorage | undefined,
   id: string,
