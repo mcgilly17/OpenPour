@@ -3,6 +3,7 @@
 Open-source (MIT) TypeScript library for Bluetooth coffee scales. It will be
 public, so write everything here for outside contributors.
 
+- What to work on next: `docs/roadmap.md`.
 - Design and API: `docs/design.md`. Decisions: `docs/adr/README.md`. Code style: `docs/conventions.md`.
 - OpenPour never performs I/O (ADR 0017). Sessions are synchronous: bytes and time in, events and commands out. No Bluetooth libraries, timers, clocks or async code anywhere in `src/`.
 - Time is always passed in by the caller as `t`. Never read the clock.
