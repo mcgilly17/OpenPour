@@ -7,6 +7,7 @@ import {
   type SavedScale,
   type ScaleStorage,
   saveScale,
+  withSavedDetails,
 } from "./savedScales.js";
 
 function memoryStorage(): ScaleStorage & { items: Map<string, string> } {
@@ -68,6 +69,21 @@ describe("saved scales", () => {
       expect(saveScale(storage, KITCHEN)).toContain("storage is unavailable");
       expect(removeSavedScale(storage, KITCHEN.id)).toContain("storage is unavailable");
     }
+  });
+
+  test("puts saved details over the export form's, except those saved blank or unknown", () => {
+    const answers = new FormData();
+    answers.set("model", "typed");
+    answers.set("modelYear", "2022");
+    answers.set("firmware", "1.0.8");
+
+    const saved = { ...KITCHEN, modelYear: "", firmware: "unknown" };
+
+    expect(Object.fromEntries(withSavedDetails(answers, saved))).toEqual({
+      model: "AL008",
+      modelYear: "2022",
+      firmware: "1.0.8",
+    });
   });
 
   test("ignores stored data that isn't a list of saved scales", () => {

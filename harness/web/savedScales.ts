@@ -85,13 +85,18 @@ export function saveScale(
   return write(storage, at === -1 ? [...scales, scale] : scales.with(at, scale));
 }
 
-/** The export form's `answers` with the saved scale's details over them, as an investigation exports. */
+/**
+ * The export form's `answers` with the saved scale's details over them, as an investigation
+ * exports. A detail saved blank or "unknown" says nothing, so the form's answer stays: the firmware
+ * the scale reported, for one.
+ */
 export function withSavedDetails(
   answers: FormData,
   saved: SavedScaleDetails | undefined,
 ): FormData {
-  if (saved) {
-    for (const name of ["model", "modelYear", "firmware"] as const) answers.set(name, saved[name]);
+  for (const name of ["model", "modelYear", "firmware"] as const) {
+    const value = saved?.[name];
+    if (value && value !== "unknown") answers.set(name, value);
   }
   return answers;
 }
