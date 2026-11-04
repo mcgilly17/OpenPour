@@ -53,6 +53,8 @@ firmware coverage stay explicit; an untested variant stays unverified.
 ## Done
 
 - [x] **0.2** Package skeleton: strict TypeScript, Vitest, Biome.
+- [x] **0.4** CI quality-checks job running `pnpm validate` on every push and
+  pull request.
 - [x] **1.2** Core types for the sans-I/O API (ADR 0017).
 - [x] **1.3** Flow filter: least-squares slope over a window, plus a deadband.
 - [x] **1.4a** Public replay helper (`openpour/replay`).
@@ -71,8 +73,6 @@ firmware coverage stay explicit; an untested variant stays unverified.
 
 ## Next
 
-- [ ] **0.4** CI quality-checks job running `pnpm validate` on every push and
-  pull request.
 - [ ] **1.9a.1-fixes** Remaining review fixes from the 1.9a.1 review round.
 - [ ] **1.9a.2** Unknown devices in the web harness. Choose a device by
   name prefix and service UUIDs, show discovered services and characteristic
