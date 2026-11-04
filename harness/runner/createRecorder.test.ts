@@ -135,7 +135,7 @@ describe("createRecorder", () => {
     const beat = INFO_WAIT_MS + NEW_STYLE_HEARTBEAT_MS;
     expect(records("tx").map(({ t }) => t)).toEqual([INFO_WAIT_MS, INFO_WAIT_MS, beat, beat]);
     const decoded = (events: TimedEvent[]) => events.filter(({ event }) => DECODED.has(event.type));
-    expect(decoded(live)).toHaveLength(12);
+    expect(decoded(live)).toHaveLength(11);
     expect(decoded(replayed.events)).toEqual(decoded(live));
   });
 
@@ -183,7 +183,7 @@ describe("createRecorder", () => {
     expect(recordedWrites.filter(({ hex }) => hex === TX.heartbeat)).toHaveLength(4);
     expect(fixture.records.at(-1)?.hex).toBe(TX.notificationRequest);
     expect(replayedWrites(replayed)).toEqual(recordedWrites);
-    expect(replayed.events.filter(({ event }) => DECODED.has(event.type))).toHaveLength(12);
+    expect(replayed.events.filter(({ event }) => DECODED.has(event.type))).toHaveLength(11);
     expect(replayed.events).toEqual(live);
   });
 });

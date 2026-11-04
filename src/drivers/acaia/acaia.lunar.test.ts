@@ -48,8 +48,9 @@ describe("Lunar: tare on the scale, its timer button, then the app's timer (C8, 
     ]);
     // The start press carries 0.2 s, not yet advanced; the stop press comes alone.
     expect(timerEvents.find(([, running]) => running)).toEqual([534790.5, true, 400]);
+    // The idle timer's first record, at 500726, is the baseline; its second shows it stopped.
     expect(stops.slice(0, 3)).toEqual([
-      [500726, false, 200],
+      [500960.2, false, 200],
       [544193.9, false, 9600],
       [546014.2, false, 200],
     ]);

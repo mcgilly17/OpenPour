@@ -70,14 +70,14 @@ describe("createScale log", () => {
       `${identified + 200} battery`,
       `${identified + 300} rx ${RX.weight}`,
       `${identified + 300} reading`,
-      `${identified + 300} timer`,
       `${identified + 400} rx ${RX.buttonStart}`,
       `${identified + 400} button`,
       `${identified + 400} reading`,
       `${identified + 500} rx ${RX.weight.slice(0, 16)}`,
       `${identified + 510} rx ${RX.weight.slice(16)}`,
-      // The timer still reads 0.2 s, so only the weight is new.
       `${identified + 510} reading`,
+      // The timer's first record, at +300, was only a baseline; this second one shows it stopped.
+      `${identified + 510} timer`,
     ]);
   });
 
@@ -107,6 +107,7 @@ describe("createScale driver commands", () => {
     for (const command of KNOWN_COMMANDS) click(panel, command);
     await vi.advanceTimersByTimeAsync(0);
     notifyHex(gatt, RX.settings, clock.now());
+    notifyHex(gatt, RX.weight, clock.now()); // its timer record, 0.2 s, is the baseline
     notifyHex(gatt, RX.timer, clock.now());
     notifyHex(gatt, RX.timerStopNotice, clock.now());
 

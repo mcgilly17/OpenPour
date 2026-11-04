@@ -85,9 +85,9 @@ describe("Pearl S: the scale's timer button, after battery requests (C9, C11)", 
     event.type === "timer" ? [[t, event.running, event.ms]] : [],
   );
 
-  test("runs while the timer records advance, stops on the stop notice, then resets", () => {
+  test("runs from the second timer record, stops on the stop notice, then resets", () => {
+    // The first record, 0.7 s at 26002.6, is the baseline: alone it can't show the timer running.
     expect(timerEvents).toEqual([
-      [26002.6, true, 700],
       [26511.9, true, 1200],
       [26991.9, true, 1600],
       [27442.5, true, 2100],

@@ -67,7 +67,6 @@ describe("acaia session handshake", () => {
       [INFO_WAIT_MS + 100, "state"],
       [INFO_WAIT_MS + 100, "battery"],
       [INFO_WAIT_MS + 200, "reading"],
-      [INFO_WAIT_MS + 200, "timer"],
     ]);
     expect(result.events[1]?.event).toEqual({ type: "state", state: "ready" });
   });
@@ -127,6 +126,7 @@ describe("acaia session data", () => {
     const result = runAcaia(
       synthetic(
         rx(200, RX.buttonStart),
+        rx(250, RX.weight), // its timer record, 0.2 s, is the baseline the next one advances from
         rx(300, RX.timer),
         rx(400, RX.settings),
         rx(500, RX.ackWithNegativeWeight),
