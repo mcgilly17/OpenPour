@@ -2,7 +2,6 @@ import { describe, expect, test } from "vitest";
 
 import {
   createFlowFilter,
-  FLOW_DEADBAND_GRAMS_PER_SEC,
   FLOW_DEADBAND_PER_SEC,
   FLOW_WINDOW_MS,
   type FlowFilter,
@@ -32,7 +31,6 @@ function pushSeries(filter: FlowFilter, count: number, gramsAt: (t: number) => n
 describe("createFlowFilter", () => {
   test("uses the documented defaults", () => {
     expect(FLOW_WINDOW_MS).toBe(500);
-    expect(FLOW_DEADBAND_GRAMS_PER_SEC).toBe(0.05);
     expect(FLOW_DEADBAND_PER_SEC).toEqual({ g: 0.05, oz: 0.05 / GRAMS_PER_OUNCE });
   });
 

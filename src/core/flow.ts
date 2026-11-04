@@ -3,7 +3,7 @@ import type { WeightUnit } from "./types.js";
 /** Trailing window for the flow slope. Long enough to average out jitter, short enough to follow a pour. */
 export const FLOW_WINDOW_MS = 500;
 /** Slopes smaller than this are load-cell drift, not a pour. */
-export const FLOW_DEADBAND_GRAMS_PER_SEC = 0.05;
+const FLOW_DEADBAND_GRAMS_PER_SEC = 0.05;
 export const GRAMS_PER_OUNCE = 28.349523125;
 /** The same drift in each unit a reading can carry. */
 export const FLOW_DEADBAND_PER_SEC: Readonly<Record<WeightUnit, number>> = {

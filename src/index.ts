@@ -1,7 +1,6 @@
 export { isOpenPourError, OpenPourError, type OpenPourErrorCode } from "./core/errors.js";
 export {
   createFlowFilter,
-  FLOW_DEADBAND_GRAMS_PER_SEC,
   FLOW_DEADBAND_PER_SEC,
   FLOW_WINDOW_MS,
   type FlowFilter,
