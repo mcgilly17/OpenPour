@@ -5,7 +5,7 @@ import unitsAtConnect from "../../../fixtures/acaia/Pearl-S_fw1.0.8_units-oz-set
 import { parseFixture } from "../../replay/parseFixture.js";
 import { ACAIA_COMMAND_VECTORS as TX } from "../../test/acaiaVectors.js";
 import { runAcaia } from "../../test/runAcaia.js";
-import { SETTINGS_REPLY_TIMEOUT_MS } from "./createAcaiaSession.js";
+import { SETTINGS_REPLY_TIMEOUT_MS, UNIT_CONFIRM_TIMEOUT_MS } from "./createAcaiaSession.js";
 
 const PEARL_S_INFO = { type: "info", firmware: "1.0.8", modelCode: "035c" };
 
@@ -35,9 +35,14 @@ describe("Pearl S: units switched to ounces on the scale mid-session (C12)", () 
     expect(readings.every(({ unit, decimals }) => unit === "g" && decimals === 1)).toBe(true);
   });
 
-  test("holds every reading from the switch on, junk included", () => {
+  test("holds every reading from the switch on, junk included, and reports the hold once", () => {
     expect(readings.at(-1)).toMatchObject({ t: 23380, value: 115.3, unit: "g" });
     expect(readings.filter(({ t }) => t >= SWITCH_T)).toEqual([]);
+    // The first weight a whole UNIT_CONFIRM_TIMEOUT_MS after the switch; the settings said grams.
+    expect(result.errors()).toEqual([
+      [27610.4, "timeout", "unit unconfirmed: weights carry 3 decimals, settings say g"],
+    ]);
+    expect(27610.4 - SWITCH_T).toBeGreaterThanOrEqual(UNIT_CONFIRM_TIMEOUT_MS);
   });
 
   test("asks for settings at the switch, then again each timeout while none answers", () => {

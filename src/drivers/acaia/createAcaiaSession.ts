@@ -11,7 +11,12 @@ import type {
 import { type AcaiaCommand, commands } from "./commands.js";
 import { createFrameReader, type Frame } from "./createFrameReader.js";
 import { createTimerTracker } from "./createTimerTracker.js";
-import { type AcaiaMessage, type AcaiaRecord, decodeMessage } from "./decodeMessage.js";
+import {
+  type AcaiaMessage,
+  type AcaiaRecord,
+  type AcaiaSettings,
+  decodeMessage,
+} from "./decodeMessage.js";
 import { type AcaiaVariant, normalizeUuid } from "./findVariant.js";
 
 /**
@@ -24,6 +29,11 @@ export const INFO_WAIT_MS = 1500;
 export const SILENCE_TIMEOUT_MS = 5000;
 /** How long to wait for asked-for settings before asking again. The Pearl S answers within 200 ms. */
 export const SETTINGS_REPLY_TIMEOUT_MS = 1000;
+/**
+ * How long readings may be held for want of a confirmed unit before that is reported once as a
+ * timeout error: about three settings requests unanswered or contradicting the weights.
+ */
+export const UNIT_CONFIRM_TIMEOUT_MS: number = 3 * SETTINGS_REPLY_TIMEOUT_MS;
 /**
  * The decimals each unit's weights carry on the Pearl S and the Lunar. Weights with other decimals
  * mean the unit was switched on the scale, which sends no new settings.
@@ -61,6 +71,18 @@ function merge(outputs: Output[]): Output {
   };
 }
 
+/** The unit settings gave, or their units code when it names none: as an error words it. */
+function settingsUnitText({ unit, unitsCode }: AcaiaSettings): string {
+  return unit ?? `units code 0x${unitsCode.toString(16).padStart(2, "0")}`;
+}
+
+function unconfirmedUnitError(decimals: number, settingsUnit: string | undefined): ScaleEvent {
+  const weights = `weights carry ${decimals} decimal${decimals === 1 ? "" : "s"}`;
+  const settings = settingsUnit === undefined ? "no settings came" : `settings say ${settingsUnit}`;
+  const error = new OpenPourError("timeout", `unit unconfirmed: ${weights}, ${settings}`);
+  return { type: "error", error };
+}
+
 /** Whether a weight record follows record `i` in the same message (see `TimerTracker`). */
 function isAheadOfWeight(records: AcaiaRecord[], i: number): boolean {
   return records.slice(i + 1).some((r) => r.kind === "weight");
@@ -79,7 +101,12 @@ export function createAcaiaSession(variant: AcaiaVariant): ScaleSession {
   let hasReportedInfo = false;
   /** The unit the last settings gave; undefined before any, and while a unit switch is confirmed. */
   let unit: WeightUnit | undefined;
+  /** What the last settings said the unit was; undefined before any. */
+  let settingsUnit: string | undefined;
   let settingsAskedAt = 0;
+  /** When readings began to be held for want of a unit; undefined while they leave. */
+  let heldSince: number | undefined;
+  let hasReportedHeld = false;
 
   function write(name: AcaiaCommand): Command {
     return {
@@ -102,12 +129,23 @@ export function createAcaiaSession(variant: AcaiaVariant): ScaleSession {
     return [write("getSettings")];
   }
 
+  /** Holding readings is reported once it has lasted too long, and again after they resume. */
+  function heldEvents(decimals: number, t: number): ScaleEvent[] {
+    heldSince ??= t;
+    if (hasReportedHeld || t - heldSince < UNIT_CONFIRM_TIMEOUT_MS) return [];
+    hasReportedHeld = true;
+    return [unconfirmedUnitError(decimals, settingsUnit)];
+  }
+
   /** No reading leaves without a unit the settings confirmed (ADR 0019). */
   function weightOutput({ value, decimals, isStable }: Weight, t: number): Output {
+    // ponytail: a fixed decimals table; learn them after confirmed settings if a model differs.
     if (unit === undefined || decimals !== UNIT_DECIMALS[unit]) {
       unit = undefined;
-      return { events: [], commands: askForSettings(t) };
+      return { events: heldEvents(decimals, t), commands: askForSettings(t) };
     }
+    heldSince = undefined;
+    hasReportedHeld = false;
     const flowPerSec = flow.push(t, value, unit);
     return only({
       type: "reading",
@@ -140,6 +178,7 @@ export function createAcaiaSession(variant: AcaiaVariant): ScaleSession {
         return merge(message.records.map((_, i) => recordOutput(message.records, i, t)));
       case "settings":
         unit = message.settings.unit;
+        settingsUnit = settingsUnitText(message.settings);
         return only({ type: "battery", percent: message.settings.batteryPercent });
       case "info":
         if (hasReportedInfo) return NOTHING;

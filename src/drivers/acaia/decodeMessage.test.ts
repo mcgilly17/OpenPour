@@ -114,27 +114,29 @@ describe("decodeMessage: settings", () => {
   test("decodes battery, masking bit 7, and units from byte 1 of the Lunar's 8 bytes", () => {
     expect(decode("settings")).toEqual({
       type: "settings",
-      settings: { batteryPercent: 93, unit: "g" },
+      settings: { batteryPercent: 93, unitsCode: 0x02, unit: "g" },
     });
     expect(decode("settingsTimerStopped")).toMatchObject({ settings: { batteryPercent: 74 } });
     expect(decode("settingsTimerRunning")).toMatchObject({ settings: { batteryPercent: 74 } });
     expect(decode("settingsOunces")).toMatchObject({ settings: { unit: "oz" } });
     expect(decode("settingsLunarOunces")).toEqual({
       type: "settings",
-      settings: { batteryPercent: 75, unit: "oz" },
+      settings: { batteryPercent: 75, unitsCode: 0x05, unit: "oz" },
     });
   });
 
   test("reads units from byte 2 of the Pearl S's 30 bytes", () => {
     expect(decode("settingsPearlS")).toEqual({
       type: "settings",
-      settings: { batteryPercent: 100, unit: "g" },
+      settings: { batteryPercent: 100, unitsCode: 0x02, unit: "g" },
     });
     expect(decode("settingsPearlSOunces")).toMatchObject({ settings: { unit: "oz" } });
   });
 
-  test("leaves a units code it doesn't know undefined", () => {
-    expect(decode("settingsUnknownUnit")).toMatchObject({ settings: { unit: undefined } });
+  test("keeps a units code it doesn't know, with no unit", () => {
+    expect(decode("settingsUnknownUnit")).toMatchObject({
+      settings: { unitsCode: 0x03, unit: undefined },
+    });
   });
 
   test("ignores settings too short to read", () => {

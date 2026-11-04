@@ -54,6 +54,8 @@ export interface AcaiaRun extends ReplayResult {
   timesOf(hex: string): number[];
   eventsOf<T extends ScaleEvent["type"]>(type: T): Extract<ScaleEvent, { type: T }>[];
   readings(): Reading[];
+  /** Each error event as `[t, code, message]`. */
+  errors(): [number, string, string][];
 }
 
 /** Replays `fixture` through a fresh Acaia session for `gatt`. */
@@ -69,5 +71,9 @@ export function runAcaia(fixture: Fixture, gatt: GattLayout = NEW_STYLE_GATT): A
     timesOf: (hex) => result.commands.filter((c) => hexOf(c.command) === hex).map((c) => c.t),
     eventsOf,
     readings: () => eventsOf("reading").map(({ reading }) => reading),
+    errors: () =>
+      result.events.flatMap(({ t, event }): [number, string, string][] =>
+        event.type === "error" ? [[t, event.error.code, event.error.message]] : [],
+      ),
   };
 }

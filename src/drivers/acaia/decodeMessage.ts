@@ -12,6 +12,8 @@ export type AcaiaRecord =
 
 export interface AcaiaSettings {
   batteryPercent: number;
+  /** The units byte as sent, e.g. 0x02. */
+  unitsCode: number;
   /** Undefined for a units code not seen yet. */
   unit: WeightUnit | undefined;
 }
@@ -129,7 +131,7 @@ function decodeSettings(payload: Uint8Array): AcaiaSettings | undefined {
   const battery = payload[0];
   const units = payload[payload.length >= LONG_SETTINGS_BYTES ? 2 : 1];
   if (battery === undefined || units === undefined) return undefined;
-  return { batteryPercent: battery & BATTERY_MASK, unit: UNITS.get(units) };
+  return { batteryPercent: battery & BATTERY_MASK, unitsCode: units, unit: UNITS.get(units) };
 }
 
 function decodeInfo(payload: Uint8Array): AcaiaInfo | undefined {
