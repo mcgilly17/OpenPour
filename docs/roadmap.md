@@ -156,6 +156,13 @@ firmware coverage stay explicit; an untested variant stays unverified.
   the contributor guide from the 1.1 findings. _Done when_ a contributor can
   see what was tested, find its evidence and reproduce the checks.
   needs: 1.5b, 1.11
+- [ ] **1.12** [OpenPour#15](https://github.com/mcgilly17/OpenPour/issues/15) Release setup: package metadata, the 0.x release
+  rule (ADR 0020), a CI release job with npm trusted publishing, and a PR-title
+  lint. Independent of the verification tasks above. _Done when_ a dry run
+  from a `v0.1.0` tag with a breaking commit computes 0.2.0, not 1.0.0.
+- [ ] **1.13** [OpenPour#16](https://github.com/mcgilly17/OpenPour/issues/16) 🧑 Publish 0.1.0 to npm, tag `v0.1.0`, and set
+  the repository as the package's trusted publisher. _Done when_ the next
+  `fix:` releases 0.1.1 from CI with no stored token. needs: 1.12
 
 ## Later
 
@@ -164,5 +171,5 @@ firmware coverage stay explicit; an untested variant stays unverified.
   second driver (Bookoo or Felicita) — [#12](https://github.com/mcgilly17/OpenPour/issues/12).
 - Web Bluetooth demo page with its own small glue — [#13](https://github.com/mcgilly17/OpenPour/issues/13).
 - README, CONTRIBUTING and changelog — [#14](https://github.com/mcgilly17/OpenPour/issues/14).
-- Publish to npm (releases are cut from conventional commits, ADR 0006).
+- 1.0.0, once the formal checks pass and a second driver has used the API (ADR 0020).
 - A native Swift binding would be separately scoped work.

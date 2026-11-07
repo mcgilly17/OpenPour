@@ -21,3 +21,4 @@
 | [0017](0017-sans-io-core.md)                       | Sans-I/O core                                | Accepted                     |
 | [0018](0018-session-start-in-fixtures.md)          | Session start in fixture headers             | Accepted                     |
 | [0019](0019-readings-in-the-scales-unit.md)        | Readings in the scale's own unit, and info   | Accepted                     |
+| [0020](0020-stay-on-0x-until-1-0-is-chosen.md)     | Stay on 0.x until 1.0 is chosen              | Accepted                     |
