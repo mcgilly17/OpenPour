@@ -2,6 +2,21 @@
   "name": "openpour",
   "version": "0.0.0",
   "description": "One API for Bluetooth coffee scales.",
+  "keywords": [
+    "coffee",
+    "scale",
+    "bluetooth",
+    "ble",
+    "acaia",
+    "espresso",
+    "pour-over"
+  ],
+  "homepage": "https://github.com/mcgilly17/OpenPour#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mcgilly17/OpenPour.git"
+  },
+  "bugs": "https://github.com/mcgilly17/OpenPour/issues",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
