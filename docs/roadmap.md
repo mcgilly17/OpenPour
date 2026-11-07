@@ -5,7 +5,8 @@ commits, docs and tests can refer to them.
 
 ## How to use this file
 
-1. Pick the first unchecked task whose `needs:` are all checked.
+1. Pick the first unchecked task whose `needs:` are all checked. Each open
+   task links to its GitHub issue, which tracks discussion and blockers.
 2. One task = one commit or PR. Tick the box in the same commit.
 3. **🧑 tasks** need a person with the hardware. Don't fake them.
 4. **DECISION tasks:** write a short proposal in `docs/adr/` (options,
@@ -73,8 +74,8 @@ firmware coverage stay explicit; an untested variant stays unverified.
 
 ## Next
 
-- [ ] **1.9a.1-fixes** Remaining review fixes from the 1.9a.1 review round.
-- [ ] **1.9a.2** Unknown devices in the web harness. Choose a device by
+- [ ] **1.9a.1-fixes** [OpenPour#1](https://github.com/mcgilly17/OpenPour/issues/1) Remaining review fixes from the 1.9a.1 review round.
+- [ ] **1.9a.2** [OpenPour#2](https://github.com/mcgilly17/OpenPour/issues/2) Unknown devices in the web harness. Choose a device by
   name prefix and service UUIDs, show discovered services and characteristic
   properties, read and subscribe to readable/notifiable characteristics, and
   record without a decoder. Unknown or non-driver services are read-only by
@@ -84,7 +85,7 @@ firmware coverage stay explicit; an untested variant stays unverified.
   damage a scale. Explain the browser's service-access limits and point to
   the Node inspector. _Done when_ a synthetic unknown device can be inspected
   and recorded without selecting or changing a brand driver. needs: 1.9a.1
-- [ ] **1.4b** `import-capture` script: converts PacketLogger or btsnoop
+- [ ] **1.4b** [OpenPour#3](https://github.com/mcgilly17/OpenPour/issues/3) `import-capture` script: converts PacketLogger or btsnoop
   captures to scrubbed fixtures (ADR 0013) using tshark. Select only the
   intended scale's services and characteristics; preserve packet boundaries,
   direction and timing; mask identifying payloads. Explain missing tools,
@@ -93,17 +94,17 @@ firmware coverage stay explicit; an untested variant stays unverified.
   scrubbing have tests, exported fixtures parse with `parseFixture`, and a CI
   check rejects MAC-shaped strings, invalid headers and committed raw
   captures. needs: 1.4a
-- [ ] **1.4c** 🧑 Capture the Acaia app writing each setting (sound,
+- [ ] **1.4c** [OpenPour#4](https://github.com/mcgilly17/OpenPour/issues/4) 🧑 Capture the Acaia app writing each setting (sound,
   auto-off, units, max weight, touch, mode) on the Pearl S and Lunar, one
   setting per trace (iPhone PacketLogger or Android HCI snoop). Raw traces
   stay local. _Done when_ each setting's write command is decoded in
   `docs/design.md`, so setting it can become a driver command. needs: 1.4b
-- [ ] **1.5d** 🧑 Record a Lunar answering a settings request: connect,
+- [ ] **1.5d** [OpenPour#5](https://github.com/mcgilly17/OpenPour/issues/5) 🧑 Record a Lunar answering a settings request: connect,
   press Battery in the harness about 5 s later, then switch units on the
   scale and keep recording for 10 s. _Done when_ the recording shows whether
   the Lunar replies to `getSettings` and whether its reply reports the new
   unit, and `docs/design.md` says so. needs: 1.5c
-- [ ] **1.9b** Guided verification in the web harness, with shared check
+- [ ] **1.9b** [OpenPour#6](https://github.com/mcgilly17/OpenPour/issues/6) Guided verification in the web harness, with shared check
   definitions and an exportable report.
   - Offer the three workflows. Show live weight and flow, a weight/flow plot,
     timer, battery, a physical-button log and controls for declared
@@ -123,25 +124,25 @@ firmware coverage stay explicit; an untested variant stays unverified.
   - _Done when_ fake-source tests exercise reporting and export for each
     outcome, and a contributor can complete the checklist and export a
     report linked to parseable recordings. needs: 1.9a
-- [ ] **1.10** Live Node harness using noble, reusing the web harness's
+- [ ] **1.10** [OpenPour#7](https://github.com/mcgilly17/OpenPour/issues/7) Live Node harness using noble, reusing the web harness's
   runner, recorder, checks and report format. _Done when_ the Node glue
   passes the same command-loop contract, both front ends produce equivalent
   records and check outcomes for the same inputs, and the terminal route is
   documented for contributors who can't use Web Bluetooth. needs: 1.9b
-- [ ] **1.11** `docs/testing-your-scale.md` and a driver submission
+- [ ] **1.11** [OpenPour#8](https://github.com/mcgilly17/OpenPour/issues/8) `docs/testing-your-scale.md` and a driver submission
   checklist for outside contributors: each workflow from a clean clone with
   exact commands, prerequisites and troubleshooting; the clean-room rules for
   unknown scales; both capture paths, naming, scrubbing and fixture/report
   linkage; the evidence a submission needs. _Done when_ the documented
   commands run against a synthetic source from a clean checkout without Nix
   or a consuming app. needs: 1.4b, 1.10
-- [ ] **1.1** 🧑 Follow the contributor guide on the Pearl S and Lunar:
+- [ ] **1.1** [OpenPour#9](https://github.com/mcgilly17/OpenPour/issues/9) 🧑 Follow the contributor guide on the Pearl S and Lunar:
   vendor-app capture (via 1.4b) and OpenPour through the harness, each scale
   alone and both together. Record model year and firmware, and every unclear
   step in the guide. _Done when_ scrubbed fixtures and check reports for each
   scale are committed and onboarding problems are recorded. needs: 1.4b,
   1.9b, 1.11
-- [ ] **1.5b** Verify the codec and session against the 1.1 evidence:
+- [ ] **1.5b** [OpenPour#10](https://github.com/mcgilly17/OpenPour/issues/10) Verify the codec and session against the 1.1 evidence:
   replay vendor-app and OpenPour captures, compare decoded results with the
   physical observations and replayed writes with the recorded tx (bytes and
   order exactly, time within a named tolerance — browser timers fire late
@@ -150,7 +151,7 @@ firmware coverage stay explicit; an untested variant stays unverified.
   verified fact to its fixture. _Done when_ both scales pass connection,
   streaming, weight, tare and timer checks on hardware with replay tests.
   needs: 1.1
-- [ ] **1.8** Reconcile `docs/design.md`, `spec/acaia.md` and a
+- [ ] **1.8** [OpenPour#11](https://github.com/mcgilly17/OpenPour/issues/11) Reconcile `docs/design.md`, `spec/acaia.md` and a
   model/firmware compatibility table with the verified results, and correct
   the contributor guide from the 1.1 findings. _Done when_ a contributor can
   see what was tested, find its evidence and reproduce the checks.
@@ -159,6 +160,9 @@ firmware coverage stay explicit; an untested variant stays unverified.
 ## Later
 
 - Settings writes as driver commands, once 1.4c decodes them.
-- More brands, through the "add an unknown scale" workflow.
+- More brands, through the "add an unknown scale" workflow, starting with a
+  second driver (Bookoo or Felicita) — [#12](https://github.com/mcgilly17/OpenPour/issues/12).
+- Web Bluetooth demo page with its own small glue — [#13](https://github.com/mcgilly17/OpenPour/issues/13).
+- README, CONTRIBUTING and changelog — [#14](https://github.com/mcgilly17/OpenPour/issues/14).
 - Publish to npm (releases are cut from conventional commits, ADR 0006).
 - A native Swift binding would be separately scoped work.
